@@ -6,39 +6,82 @@ import time
 import matplotlib.pyplot as plt
 
 
-#collect historical data via cryptodatadownload
+#collect historical data via cryptodatadownload an yfinace and merge them together
 
 def historical_data(crypto="BTC",
                     curr = "USD",
                     gran= "d"):
     
-    #gran = ["minute", "hour", "dailyd"]
+    #gran = ["minute", "hour", "d"]
+    gran_LOOKUP_cdd = {
+        "d": "d",
+        "day": "d",
+        "h": "60m",
+        "m": "minute"
+    }
     
+    col = ["unix", "date", "high", "low"]
+
+    #1. collect data from cryptodatadownload
+
     if curr == "USD":
         curr = "USDT"
 
-    url_hist_data = f"https://www.cryptodatadownload.com/cdd/Binance_{crypto}{curr}_{gran}.csv"
+    url_cdd = f"https://www.cryptodatadownload.com/cdd/Binance_{crypto}{curr}_{gran_LOOKUP_cdd[gran]}.csv"
 
     print(curr)
 
-    print(url_hist_data)
+    print(url_cdd)
 
-    hist_data = pd.read_csv(url_hist_data, skiprows=1) 
+    hist_data_cdd = pd.read_csv(url_cdd, skiprows=1) 
+    hist_data_cdd.columns = map(str.lower, hist_data_cdd.columns)
+    hist_data_cdd["unix"] = hist_data_cdd['unix'] // 1000    #unix is displayed in milliseconds. To match yfinance it must be displayed in sec.
 
-    hist_data_delta = process_raw_DF(hist_data)
+    #hist_data_delta_cdd = process_raw_DF(hist_data_cdd)
     
-    return hist_data_delta
+
+    #2. collect data from yfinance
+    import yfinance as yf
+
+    gran_LOOKUP = {
+        "d": "1d",
+        "h": "60m",
+        "m": "1m"
+    }
+
+    crypto_chart = yf.Ticker(f"{crypto}-{curr}")
+    hist_data_yf = reset_index(crypto_chart.history(period="max", interval=gran_LOOKUP[gran]))
+
+
+    #merge cdd and yf
+    hist_data = pd.merge(hist_data_yf, hist_data_cdd, on='unix', how='outer').sort_values('unix').reset_index(drop=True)
+    
+    hist_data = process_raw_DF(hist_data)
+
+    return hist_data
+
+def reset_index(df):
+    df = df.reset_index()
+    df.columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'dividends','stock splits']
+    df['unix'] = df['date'].dt.floor('D').astype('int64') // 10**9  #correcting date for midnight
+    return df
 
 
 # Processing Output from historical_data() for further analysis
 def process_raw_DF(DF):
+    col = ["unix", "date", "high", "low","delta_high","delta_low"]
+    # merge different highs and lows for the same timepoint:
+    DF['high'] = DF[['high_x', 'high_y']].mean(axis=1, skipna=True)
+    DF['low'] = DF[['low_x', 'low_y']].mean(axis=1, skipna=True)
+
     #convert Unix timestamp to readable date-time format
-    #DF["Date"] = [datetime.utcfromtimestamp(DF["Unix Timestamp"][ts]).strftime('%Y-%m-%d %H:%M:%S') for ts in range(0,len(DF["Unix Timestamp"]))]
+    DF['date'] = pd.to_datetime(DF['unix'], unit='s')
     #Calculate deltas for data points
-    DF["Delta_High"] = DF["High"].diff()
-    DF["Delta_Low"] = DF["Low"].diff()
+
+    DF["delta_high"] = DF["high"].diff()
+    DF["delta_low"] = DF["low"].diff()
     
-    return DF
+    return DF[col]
 
 
 def log10(df):
