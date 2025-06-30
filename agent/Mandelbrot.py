@@ -4,6 +4,7 @@ import requests
 from datetime import datetime
 import time
 import matplotlib.pyplot as plt
+import scipy
 
 
 #collect historical data via cryptodatadownload an yfinace and merge them together
@@ -29,9 +30,7 @@ def historical_data(crypto="BTC",
 
     url_cdd = f"https://www.cryptodatadownload.com/cdd/Binance_{crypto}{curr}_{gran_LOOKUP_cdd[gran]}.csv"
 
-    print(curr)
-
-    print(url_cdd)
+    print(f"downloading the {curr} price/{gran} for {crypto} from {url_cdd}....")
 
     hist_data_cdd = pd.read_csv(url_cdd, skiprows=1) 
     hist_data_cdd.columns = map(str.lower, hist_data_cdd.columns)
@@ -52,13 +51,45 @@ def historical_data(crypto="BTC",
     crypto_chart = yf.Ticker(f"{crypto}-{curr}")
     hist_data_yf = reset_index(crypto_chart.history(period="max", interval=gran_LOOKUP[gran]))
 
+    print(f"downloading the {curr} price/{gran} for {crypto} from yfinance....")
+
 
     #merge cdd and yf
     hist_data = pd.merge(hist_data_yf, hist_data_cdd, on='unix', how='outer').sort_values('unix').reset_index(drop=True)
     
     hist_data = process_raw_DF(hist_data)
 
+    print("merge dataframes")
+
+
     return hist_data
+
+
+def historical_datasets(crypto="BTC",
+                        curr = "USD"):
+    MIN  = historical_data(crypto=crypto, curr = curr, gran = "m")
+    DAY  = historical_data(crypto=crypto, curr = curr, gran = "d")
+
+    #calculate Hour
+    HOUR = MIN[MIN.date.dt.minute == 0 ]
+    HOUR["delta_high"] = HOUR["high"].diff()
+    HOUR["delta_low"] = HOUR["low"].diff()
+
+    #calculate week
+    WEEK = DAY[DAY.date.dt.weekday == 0]
+    WEEK["delta_high"] = WEEK["high"].diff()
+    WEEK["delta_low"] = WEEK["low"].diff()
+
+    #calculate month
+    MONTH = DAY[DAY.date.dt.is_month_start]
+    MONTH["delta_high"] = MONTH["high"].diff()
+    MONTH["delta_low"] = MONTH["low"].diff()
+
+
+    return MIN, HOUR, DAY, WEEK, MONTH 
+
+    
+
 
 def reset_index(df):
     df = df.reset_index()
@@ -114,11 +145,11 @@ def gran_calc(unit="d"):
         print("no valid unit")
         
     return gran
+##############################################################
 
 
 
-
-def calculate_pdf_fits(data, PDF):
+def calculate_pdf(data, PDF):
     from scipy.stats import norm, cauchy, lognorm, expon, kstest
     #get parameter
     dist = getattr(scipy.stats, PDF)
@@ -132,14 +163,36 @@ def calculate_pdf_fits(data, PDF):
     xmin, xmax = plt.xlim()
     x = np.linspace(xmin, xmax, 100)
 
-    ks = kstest(data, 'norm', args=(loc, scale))
+    
     
     if arg:
         pdf_fitted = dist.pdf(x, *arg, loc=loc, scale=scale)
     else:
         pdf_fitted = dist.pdf(x, loc=loc, scale=scale)
     
-    return params, pdf_fitted, x, ks
+    return params, pdf_fitted, x
+
+def calculate_pdf_fit(data, params):
+    from scipy.stats import norm, cauchy, lognorm, expon, kstest
+    arg = params[:-2]
+    loc = params[-2]
+    scale = params[-1]
+
+    fit_test = []
+    
+    #kolmogorov-smirnoff test
+    ks = scipy.stats.kstest(data, 'norm', args=(loc, scale))
+    fit_test.append(ks)
+    
+    #anderson >>> more sensitive for the tails
+    ad = scipy.stats.anderson(data, 'norm')
+    fit_test.append(ad)
+    
+    #Cramér von mises Test
+    cvm = scipy.stats.cramervonmises(data, 'norm')
+    fit_test.append(cvm)
+
+    return fit_test
 
 
 
