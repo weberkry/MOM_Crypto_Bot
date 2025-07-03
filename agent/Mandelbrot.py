@@ -148,6 +148,50 @@ def gran_calc(unit="d"):
 ##############################################################
 
 
+def gauss_pdf(data):
+    params = scipy.stats.norm.fit(data,method="mle")
+
+    #params
+    sigma = params[-2]
+    mu = params[-1]
+
+
+    loglik = np.sum(norm.logpdf(data, *params))
+    aic = aic(loglik, 2)
+    cvm = scipy.stats.cramervonmises(data, 'norm')
+
+    #fit density
+    xmin, xmax = plt.xlim()
+    x = np.linspace(xmin, xmax, 100)
+    pdf_fitted = dist.pdf(x, loc=x0, scale=mu)
+
+    return params, pdf_fitted, x, cvm
+
+
+
+def cauchy_pdf(data):
+    params = scipy.stats.norm.fit(data,method="mle")
+
+    #params
+    x0 = params[-2]
+    gamma = params[-1]
+
+
+    loglik = np.sum(cauchy.logpdf(data, *params))
+    aic = aic(loglik, 2)
+    cvm = scipy.stats.cramervonmises(data, 'cauchy')
+
+    #fit density
+    xmin, xmax = plt.xlim()
+    x = np.linspace(xmin, xmax, 100)
+    pdf_fitted = dist.pdf(x, loc=x0, scale=gamma)
+
+    return params, pdf_fitted, x, cvm
+
+
+
+def aic(loglik, num_params):
+    return 2 * num_params - 2 * loglik
 
 def calculate_pdf(data, PDF):
     from scipy.stats import norm, cauchy, lognorm, expon, kstest
@@ -181,12 +225,7 @@ def calculate_pdf_fit(data, params):
     fit_test = []
     
     #kolmogorov-smirnoff test
-    ks = scipy.stats.kstest(data, 'norm', args=(loc, scale))
-    fit_test.append(ks)
     
-    #anderson >>> more sensitive for the tails
-    ad = scipy.stats.anderson(data, 'norm')
-    fit_test.append(ad)
     
     #Cramér von mises Test
     cvm = scipy.stats.cramervonmises(data, 'norm')
