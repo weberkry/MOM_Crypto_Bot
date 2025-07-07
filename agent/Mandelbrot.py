@@ -35,9 +35,11 @@ def historical_data(crypto="BTC",
     hist_data_cdd = pd.read_csv(url_cdd, skiprows=1) 
     hist_data_cdd.columns = map(str.lower, hist_data_cdd.columns)
     hist_data_cdd["unix"] = hist_data_cdd['unix'] // 1000    #unix is displayed in milliseconds. To match yfinance it must be displayed in sec.
+    hist_data_cdd["volume"] = hist_data_cdd[f"volume {crypto.lower()}"]
 
     #hist_data_delta_cdd = process_raw_DF(hist_data_cdd)
-    
+    #print("---cdd---")
+    #print(hist_data_cdd.head())
 
     #2. collect data from yfinance
     import yfinance as yf
@@ -54,13 +56,14 @@ def historical_data(crypto="BTC",
     print(f"downloading the {curr} price/{gran} for {crypto} from yfinance....")
 
 
+    #print("---yf---")
+    #print(hist_data_yf.head())
+
+
     #merge cdd and yf
     hist_data = pd.merge(hist_data_yf, hist_data_cdd, on='unix', how='outer').sort_values('unix').reset_index(drop=True)
-    
     hist_data = process_raw_DF(hist_data)
-
-    print("merge dataframes")
-
+    print("merged yf and cdd")
 
     return hist_data
 
@@ -68,22 +71,25 @@ def historical_data(crypto="BTC",
 def historical_datasets(crypto="BTC",
                         curr = "USD"):
     MIN  = historical_data(crypto=crypto, curr = curr, gran = "m")
+    print('-----------------------------DF Tail Minute')
+    print(MIN.tail())
     DAY  = historical_data(crypto=crypto, curr = curr, gran = "d")
 
     #calculate Hour
     HOUR = MIN[MIN.date.dt.minute == 0 ]
-    HOUR["delta_high"] = HOUR["high"].diff()
-    HOUR["delta_low"] = HOUR["low"].diff()
+    HOUR.loc[:,"delta_high"] = HOUR["high"].diff()
+    HOUR.loc[:,"delta_low"] = HOUR["low"].diff()
 
     #calculate week
     WEEK = DAY[DAY.date.dt.weekday == 0]
-    WEEK["delta_high"] = WEEK["high"].diff()
-    WEEK["delta_low"] = WEEK["low"].diff()
+    #.loc[row_indexer,col_indexer] 
+    WEEK.loc[:,"delta_high"] = WEEK["high"].diff()
+    WEEK.loc[:,"delta_low"] = WEEK["low"].diff()
 
     #calculate month
     MONTH = DAY[DAY.date.dt.is_month_start]
-    MONTH["delta_high"] = MONTH["high"].diff()
-    MONTH["delta_low"] = MONTH["low"].diff()
+    MONTH.loc[:,"delta_high"] = MONTH["high"].diff()
+    MONTH.loc[:,"delta_low"]= MONTH["low"].diff()
 
 
     return MIN, HOUR, DAY, WEEK, MONTH 
@@ -100,10 +106,13 @@ def reset_index(df):
 
 # Processing Output from historical_data() for further analysis
 def process_raw_DF(DF):
-    col = ["unix", "date", "high", "low","delta_high","delta_low"]
+    col = ["unix", "date","volume", "high", "low","delta_high","delta_low"]
+    print("-----------------------------------------------------------------------")
+    print(DF.head())
     # merge different highs and lows for the same timepoint:
     DF['high'] = DF[['high_x', 'high_y']].mean(axis=1, skipna=True)
     DF['low'] = DF[['low_x', 'low_y']].mean(axis=1, skipna=True)
+    DF['volume'] = DF[['volume_x','volume_y']].mean(axis=1, skipna=True)
 
     #convert Unix timestamp to readable date-time format
     DF['date'] = pd.to_datetime(DF['unix'], unit='s')
@@ -111,6 +120,9 @@ def process_raw_DF(DF):
 
     DF["delta_high"] = DF["high"].diff()
     DF["delta_low"] = DF["low"].diff()
+
+    print("-----------------------------------------------------------------------")
+    print(DF.head())
     
     return DF[col]
 
@@ -149,44 +161,46 @@ def gran_calc(unit="d"):
 
 
 def gauss_pdf(data):
-    params = scipy.stats.norm.fit(data,method="mle")
+    dist = getattr(scipy.stats, "norm")
+    params = dist.fit(data,method="mle")
 
     #params
     sigma = params[-2]
     mu = params[-1]
 
 
-    loglik = np.sum(norm.logpdf(data, *params))
-    aic = aic(loglik, 2)
-    cvm = scipy.stats.cramervonmises(data, 'norm')
+    #loglik = np.sum(norm.logpdf(data, *params))
+    #aic = aic(loglik, 2)
+    #cvm = scipy.stats.cramervonmises(data, 'norm')
 
     #fit density
     xmin, xmax = plt.xlim()
     x = np.linspace(xmin, xmax, 100)
-    pdf_fitted = dist.pdf(x, loc=x0, scale=mu)
+    pdf_fitted = dist.pdf(x, loc=sigma, scale=mu)
 
-    return params, pdf_fitted, x, cvm
+    return params, pdf_fitted, x
 
 
 
 def cauchy_pdf(data):
-    params = scipy.stats.norm.fit(data,method="mle")
+    dist = getattr(scipy.stats, "cauchy")
+    params = dist.fit(data,method="mle")
 
     #params
     x0 = params[-2]
     gamma = params[-1]
 
 
-    loglik = np.sum(cauchy.logpdf(data, *params))
-    aic = aic(loglik, 2)
-    cvm = scipy.stats.cramervonmises(data, 'cauchy')
+    #loglik = np.sum(cauchy.logpdf(data, *params))
+    #aic = aic(loglik, 2)
+    #cvm = scipy.stats.cramervonmises(data, 'cauchy')
 
     #fit density
     xmin, xmax = plt.xlim()
     x = np.linspace(xmin, xmax, 100)
     pdf_fitted = dist.pdf(x, loc=x0, scale=gamma)
 
-    return params, pdf_fitted, x, cvm
+    return params, pdf_fitted, x
 
 
 
