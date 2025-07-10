@@ -159,6 +159,15 @@ def gran_calc(unit="d"):
     return gran
 ##############################################################
 
+def process_csv(gran="min"):
+    DF = pd.read_csv(f"{gran}.csv")
+    DF.loc[:,'date'] = pd.to_datetime(DF['unix'],unit='s')
+    DF = DF[DF['date'] < pd.Timestamp('2024-01-01 00:00:00')] #cutoff ---> incomplete data
+    DF['date'] = pd.to_datetime(DF['date'])
+    DF['timedelta'] = DF['date'].diff()
+    
+    return DF
+
 
 def gauss_pdf(data):
     dist = getattr(scipy.stats, "norm")
