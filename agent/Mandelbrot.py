@@ -5,6 +5,8 @@ from datetime import datetime
 import time
 import matplotlib.pyplot as plt
 import scipy
+from scipy.stats import linregress
+
 
 
 #collect historical data via cryptodatadownload an yfinace and merge them together
@@ -258,29 +260,76 @@ def calculate_pdf_fit(data, params):
 
 
 
-# calculate hurst exponent
+class hurst:
+    def __init__(self):
+        self.hurst = None
+        self.Y = None
+        self.linfit = None
+        self.rs_range = None
+        self.subset_length = None
 
-def hurst_exp(DF, interval):
-    
-    lags = range(1, interval)
+    def rescaled_range(self, data, power, rolling_window="false"):
+        l = 2 ** power  # length of each subset
+        n = int(len(data) / l)  # number of subsets
+        R_S_per_segment = []
 
-    tau = [np.sqrt(np.std(np.subtract(np.array(DF[lag:]), np.array(DF[:-lag])))) for lag in lags]
-    
-    reg = linregress(np.log(lags),np.log(tau))
-    hurst = reg.slope*2
-    
-    return hurst, tau, lags
+        if rolling_window == "true":
+            print(f"Data gets divided into {len(data) - l + 1} rolling windows of length {l}")
+            for k in range(l, len(data) + 1):
+                subset = data[k - l:k]
+                mean = np.mean(subset)
+                std = np.std(subset)
+                Y_cumsum = np.cumsum(subset - mean)
+                R = np.max(Y_cumsum) - np.min(Y_cumsum)
+                R_S = R / std if std != 0 else 0
+                R_S_per_segment.append(R_S)
+        else:
+            print(f"Data gets divided into {n} fixed windows of length {l}")
+            for k in range(n):
+                subset = data[k * l:(k + 1) * l]
+                mean = np.mean(subset)
+                std = np.std(subset)
+                Y_cumsum = np.cumsum(subset - mean)
+                R = np.max(Y_cumsum) - np.min(Y_cumsum)
+                R_S = R / std if std != 0 else 0
+                R_S_per_segment.append(R_S)
 
-def hurst_per_interval(DF, iteration =1, maximum= 1000, gran = "day"):
-    
-    hurst_per_interval = pd.DataFrame(columns=["Asset","interval","Hurst","gran"])
-    Curr = DF["Asset"][1]
+        R_S_mean = np.mean(R_S_per_segment)
+        return R_S_mean, l
 
-    for i in range(2,maximum, iteration):
+    def fit(self, data, power, rolling_window="false"):
+        L = []
+        R_S_mean_list = []
         
-        hurst, tau , lags = hurst_exp(DF["High"], i)
-        row = [Curr,i,hurst, DF["gran"][1]]
-        #print(row)
-        hurst_per_interval.loc[len(hurst_per_interval)] = row
+        #loop through different lengths relating to the base 2
+        for p in range(2, power + 1):
+            r_s_mean, l = self.rescaled_range(data=data, power=p, rolling_window=rolling_window)
+            L.append(l)
+            R_S_mean_list.append(r_s_mean)
+
+        #fit linear regression
+        slope, intercept, r_value, p_value, std_err = linregress(np.log(L), np.log(R_S_mean_list))
+
+        #reconstruct fitted values
+        Y = [slope * np.log(l) + intercept for l in L]
+
+        #store values in the instance
+        self.hurst = slope
+        self.Y = Y
+        self.linfit = [slope, intercept, p_value]
+        self.rs_range = R_S_mean_list
+        self.subset_length = L
+
+        return slope  #hurst
     
-    return hurst_per_interval
+    def plot_fit(self):
+        plt.scatter(np.log(self.subset_length),np.log(self.rs_range))
+        plt.plot(np.log(self.subset_length), self.Y, label=f'linear Fit: Hurst={self.linfit[0]:.3f}', color='red')
+        #plt.text(x=0.9,y=0.1,s=f"Y={H}*x+{fit[1]}")
+        plt.ylabel("log(R/S)")
+        plt.xlabel("log(length)")
+        plt.title('Hurst Exponent via Rescaled Range Analysis')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+        
