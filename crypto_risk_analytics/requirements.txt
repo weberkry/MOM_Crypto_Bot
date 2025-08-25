@@ -1,0 +1,11 @@
+pandas
+numpy
+scipy
+ccxt
+influxdb-client
+requests
+python-dotenv
+schedule
+scikit-learn
+nltk
+beautifulsoup4

@@ -268,12 +268,14 @@ class hurst:
         self.rs_range = None
         self.subset_length = None
 
-    def rescaled_range(self, data, power, rolling_window="false"):
+    def rescaled_range(self, data, power=9, rolling_window=False):
+        #the len should be at least 512 /power =9
         l = 2 ** power  # length of each subset
+        #l = power
         n = int(len(data) / l)  # number of subsets
         R_S_per_segment = []
 
-        if rolling_window == "true":
+        if rolling_window == True:
             print(f"Data gets divided into {len(data) - l + 1} rolling windows of length {l}")
             for k in range(l, len(data) + 1):
                 subset = data[k - l:k]
@@ -297,12 +299,12 @@ class hurst:
         R_S_mean = np.mean(R_S_per_segment)
         return R_S_mean, l
 
-    def fit(self, data, power, rolling_window="false"):
+    def fit(self, data, power, rolling_window=False):
         L = []
         R_S_mean_list = []
         
         #loop through different lengths relating to the base 2
-        for p in range(2, power + 1):
+        for p in range(6, power + 1):
             r_s_mean, l = self.rescaled_range(data=data, power=p, rolling_window=rolling_window)
             L.append(l)
             R_S_mean_list.append(r_s_mean)
