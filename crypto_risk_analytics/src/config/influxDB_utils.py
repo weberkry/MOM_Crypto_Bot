@@ -25,7 +25,7 @@ def get_query_api(client):
     return client.query_api()
 
 
-def write_dataframe(df, measurement="crypto_price_"):
+def write_dataframe(df):
     """
     Write a pandas DataFrame to InfluxDB.
     Expects columns: time, price, asset, currency, interval
@@ -42,7 +42,7 @@ def write_dataframe(df, measurement="crypto_price_"):
         bucket=INFLUX_BUCKET,
         org=INFLUX_ORG,
         record=df,
-        data_frame_measurement_name=measurement+df.interval.iloc[0],
+        data_frame_measurement_name=df.interval.iloc[0],
         data_frame_tag_columns=["asset", "currency", "interval"],
     )
     print(f"Wrote {len(df)} rows to InfluxDB bucket '{INFLUX_BUCKET}'")

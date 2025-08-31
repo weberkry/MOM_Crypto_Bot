@@ -119,17 +119,20 @@ def reset_index(df):
     df['unix'] = df['date'].dt.floor('D').astype('int64') // 10**9  #correcting date for midnight
     return df
 
+#def mean_xy(df)
+
 
 # Processing Output from historical_data() for further analysis
 def process_raw_DF(DF):
     from datetime import datetime, timezone
-    col = ["unix", "date","volume", "high", "low","delta_high","delta_low"]
+    col = ["unix", "date","volume", "high","low","delta","delta_log","return","return_log"]
     #print("-----------------------------------------------------------------------")
     #print(DF.head())
+    if "high_x" in DF.columns:
     # merge different highs and lows for the same timepoint:
-    DF['high'] = DF[['high_x', 'high_y']].mean(axis=1, skipna=True)
-    DF['low'] = DF[['low_x', 'low_y']].mean(axis=1, skipna=True)
-    DF['volume'] = DF[['volume_x','volume_y']].mean(axis=1, skipna=True)
+        DF['high'] = DF[['high_x', 'high_y']].mean(axis=1, skipna=True)
+        DF['low'] = DF[['low_x', 'low_y']].mean(axis=1, skipna=True)
+        DF['volume'] = DF[['volume_x','volume_y']].mean(axis=1, skipna=True)
 
     #convert Unix timestamp to readable date-time format
     DF['date'] = pd.to_datetime(DF['unix'], unit='s')
@@ -142,8 +145,10 @@ def process_raw_DF(DF):
 
     #Calculate deltas for data points
 
-    DF["delta_high"] = DF["high"].diff()
-    DF["delta_low"] = DF["low"].diff()
+    DF["delta"] = DF["high"].diff()
+    DF["delta_log"] = log10(DF["delta"])
+    DF["return"] = compute_returns(DF["high"])[0]
+    DF["return_log"] = compute_returns(DF["high"])[0]
 
     #print("-----------------------------------------------------------------------")
     #print(DF.head())
@@ -166,6 +171,10 @@ def log10(df):
             #print(i,x,y)
             
     return y
+
+def compute_returns(series):
+    return series.pct_change(), np.log(series / series.shift(1)) #simple_return,log return
+  
 
 
 ##### NO LONGER IN USE --> only relevant for coinbase api, but historical data gets now downloaded via cryptodatadownload.com
