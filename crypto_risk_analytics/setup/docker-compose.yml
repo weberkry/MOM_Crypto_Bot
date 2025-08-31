@@ -11,11 +11,11 @@ services:
       - influxdb_data:/var/lib/influxdb2
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=weberkry
-      - DOCKER_INFLUXDB_INIT_PASSWORD=Ys0!Zerius?In
-      - DOCKER_INFLUXDB_INIT_ORG=CryptoMOM
-      - DOCKER_INFLUXDB_INIT_BUCKET=CryptoPrices
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=FYT0KubDTg80gHiQqFp_zLVdm9knu842vvJ-arqsEwEnHaeyVbblEcDEyevpyOcqhQGijjq7KE4DFYB6AYPLvg==
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USR}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PWD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
 
   telegraf:
     image: telegraf:1.29
@@ -41,8 +41,8 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=weberkry
-      - GF_SECURITY_ADMIN_PASSWORD=Ys0!Zerius?Gr
+      - GF_SECURITY_ADMIN_USER=${GRF_USR}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRF_PWD}
     depends_on:
       - influxdb
 
