@@ -2,6 +2,8 @@ import os
 from dotenv import load_dotenv
 from influxdb_client import InfluxDBClient, WriteOptions
 from influxdb_client.client.write_api import SYNCHRONOUS
+import pandas as pd
+from datetime import datetime, timezone, timedelta
 
 # Load env from project root
 load_dotenv()
@@ -67,3 +69,200 @@ def query_last_timestamp(asset, currency, granularity, measurement="crypto_price
     if tables and tables[0].records:
         return tables[0].records[0].get_time()
     return None
+
+
+#def backup_to_csv(output_dir="backup", bucket=INFLUX_BUCKET):
+
+    """
+    Query all data from a bucket and save separate CSVs
+    for each (asset, interval) combination.
+    """
+    client = get_client()
+    query_api = client.query_api()
+
+    # --- Step 1: get unique tag values ---
+    flux_assets = f'''
+    import "influxdata/influxdb/schema"
+    schema.tagValues(bucket: "{bucket}", tag: "asset")
+    '''
+    assets = []
+    for table in query_api.query(flux_assets):
+        for record in table.records:
+            assets.append(record.get_value())
+
+    flux_intervals = f'''
+    import "influxdata/influxdb/schema"
+    schema.tagValues(bucket: "{bucket}", tag: "interval")
+    '''
+    intervals = []
+    for table in query_api.query(flux_intervals):
+        for record in table.records:
+            intervals.append(record.get_value())
+
+    os.makedirs(output_dir, exist_ok=True)
+    saved_files = []
+
+    # Step 2: Loop over tag combos
+    for asset in assets:
+        for interval in intervals:
+            flux = f'''
+            from(bucket: "{bucket}")
+              |> range(start: 0)
+              |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+              |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+              |> keep(columns: ["_time","_measurement","asset","currency","interval","price","volume"])
+            '''
+            df = query_api.query_data_frame(flux)
+
+            if df.empty:
+                print(f"No data for {asset} @ {interval}")
+                continue
+
+            df["_time"] = pd.to_datetime(df["_time"])
+            filename = f"{bucket}_{asset}_{interval}_{datetime.now().strftime('%Y%m%d')}.csv"
+            filepath = os.path.join(output_dir, filename)
+            df.to_csv(filepath, index=False)
+            print(f"Saved {filepath}")
+            saved_files.append(filepath)
+
+    return saved_files
+
+
+#def backup_to_csv_by_year(output_dir="backup", bucket=INFLUX_BUCKET):
+
+    """
+    Query all data from a bucket and save separate CSVs per asset/interval/year
+    to avoid timeouts for large datasets (Minute data).
+    """
+    client = get_client()
+    query_api = client.query_api()
+
+    # Step 1: get unique tag values
+    flux_assets = '''
+    import "influxdata/influxdb/schema"
+    schema.tagValues(bucket: "%s", tag: "asset")
+    ''' % bucket
+    assets = [record.get_value() for table in query_api.query(flux_assets) for record in table.records]
+
+    flux_intervals = '''
+    import "influxdata/influxdb/schema"
+    schema.tagValues(bucket: "%s", tag: "interval")
+    ''' % bucket
+    intervals = [record.get_value() for table in query_api.query(flux_intervals) for record in table.records]
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    saved_files = []
+
+    for asset in assets:
+        for interval in intervals:
+            # Determine date range for iteration
+            current_year = 2015  # or the first year of your data
+            this_year = datetime.now().year
+
+            while current_year <= this_year:
+                start = datetime(current_year, 1, 1, tzinfo=timezone.utc)
+                end = datetime(current_year + 1, 1, 1, tzinfo=timezone.utc)
+
+                flux = f'''
+                from(bucket: "{bucket}")
+                  |> range(start: {start.isoformat()}, stop: {end.isoformat()})
+                  |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+                  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                  |> keep(columns: ["_time","asset","currency","interval","price","volume"])
+                '''
+                df = query_api.query_data_frame(flux)
+
+                if not df.empty:
+                    df["_time"] = pd.to_datetime(df["_time"])
+                    filename = f"{bucket}_{asset}_{interval}_{current_year}.csv"
+                    filepath = os.path.join(output_dir, filename)
+                    df.to_csv(filepath, index=False)
+                    print(f"Saved {filepath} ({len(df)} rows)")
+                    saved_files.append(filepath)
+
+                current_year += 1
+
+    return saved_files
+
+
+
+def backup_csv(output_dir="backup", bucket=INFLUX_BUCKET):
+    """
+    Backup InfluxDB data into CSVs.
+    - Day/Hour/Week: yearly
+    - Minute: monthly (to avoid timeouts)
+    """
+    client = get_client()
+    query_api = client.query_api()
+
+    # Get unique tag values
+    flux_assets = f'''
+    import "influxdata/influxdb/schema"
+    schema.tagValues(bucket: "{bucket}", tag: "asset")
+    '''
+    assets = [r.get_value() for t in query_api.query(flux_assets) for r in t.records]
+
+    flux_intervals = f'''
+    import "influxdata/influxdb/schema"
+    schema.tagValues(bucket: "{bucket}", tag: "interval")
+    '''
+    intervals = [r.get_value() for t in query_api.query(flux_intervals) for r in t.records]
+
+    os.makedirs(output_dir, exist_ok=True)
+    saved_files = []
+
+    for asset in assets:
+        for interval in intervals:
+            # Determine start/end periods
+            now = datetime.now().year
+            if interval == "Minute":
+                # Monthly chunks
+                start_year = 2015
+                start_month = 1
+                while start_year <= now:
+                    for month in range(1, 13):
+                        start = datetime(start_year, month, 1, tzinfo=timezone.utc)
+                        if month == 12:
+                            end = datetime(start_year+1, 1, 1, tzinfo=timezone.utc)
+                        else:
+                            end = datetime(start_year, month+1, 1, tzinfo=timezone.utc)
+
+                        flux = f'''
+                        from(bucket: "{bucket}")
+                          |> range(start: {start.isoformat()}, stop: {end.isoformat()})
+                          |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+                          |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                          |> keep(columns: ["_time","asset","currency","interval","price","volume"])
+                        '''
+                        df = query_api.query_data_frame(flux)
+                        if not df.empty:
+                            df["_time"] = pd.to_datetime(df["_time"])
+                            filename = f"{bucket}_{asset}_{interval}_{start_year}_{month:02d}.csv"
+                            filepath = os.path.join(output_dir, filename)
+                            df.to_csv(filepath, index=False)
+                            print(f"✅ Saved {filepath} ({len(df)} rows)")
+                            saved_files.append(filepath)
+                    start_year += 1
+            else:
+                # Yearly chunks
+                for year in range(2015, now+1):
+                    start = datetime(year, 1, 1, tzinfo=timezone.utc)
+                    end = datetime(year+1, 1, 1, tzinfo=timezone.utc)
+                    flux = f'''
+                    from(bucket: "{bucket}")
+                      |> range(start: {start.isoformat()}, stop: {end.isoformat()})
+                      |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+                      |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                      |> keep(columns: ["_time","asset","currency","interval","price","volume"])
+                    '''
+                    df = query_api.query_data_frame(flux)
+                    if not df.empty:
+                        df["_time"] = pd.to_datetime(df["_time"])
+                        filename = f"{bucket}_{asset}_{interval}_{year}.csv"
+                        filepath = os.path.join(output_dir, filename)
+                        df.to_csv(filepath, index=False)
+                        print(f"Saved {filepath} ({len(df)} rows)")
+                        saved_files.append(filepath)
+
+    return saved_files
