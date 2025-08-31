@@ -27,7 +27,7 @@ def get_query_api(client):
     return client.query_api()
 
 
-def write_dataframe(df):
+#def write_dataframe(df):
     """
     Write a pandas DataFrame to InfluxDB.
     Expects columns: time, price, asset, currency, interval
@@ -48,6 +48,50 @@ def write_dataframe(df):
         data_frame_tag_columns=["asset", "currency", "interval"],
     )
     print(f"Wrote {len(df)} rows to InfluxDB bucket '{INFLUX_BUCKET}'")
+
+
+def write_dataframe(df, measurement="crypto_price_", chunk_size=10_000):
+    """
+    Write a pandas DataFrame to InfluxDB in safe chunks to avoid timeouts.
+    Expects:
+      - index: datetime64[ns, UTC]
+      - columns: price, asset, currency, interval (+ any other fields)
+    """
+    client = get_client()
+
+    # Use asynchronous batched writing
+    write_api = client.write_api(
+        write_options=WriteOptions(
+            batch_size=5000,          # number of rows per batch
+            flush_interval=10_000,    # flush buffer every 10s
+            jitter_interval=2_000,    # randomize flush a little
+            retry_interval=5_000,     # retry wait if failed
+            max_retries=5,            # max retries
+            max_retry_delay=30_000,   # max retry backoff
+            exponential_base=2
+        )
+    )
+
+    if not df.index.dtype.kind == "M":
+        raise ValueError("DataFrame index must be datetime64[ns, UTC]")
+
+    # Split DF into chunks
+    total_rows = len(df)
+    for start in range(0, total_rows, chunk_size):
+        chunk = df.iloc[start:start+chunk_size]
+
+        write_api.write(
+            bucket=INFLUX_BUCKET,
+            org=INFLUX_ORG,
+            record=chunk,
+            data_frame_measurement_name=measurement + str(chunk.interval.iloc[0]),
+            data_frame_tag_columns=["asset", "currency", "interval"],
+        )
+
+        print(f"Wrote rows {start}–{start+len(chunk)-1} "
+              f"({len(chunk)}) to InfluxDB bucket '{INFLUX_BUCKET}'")
+
+    print(f"Finished writing {total_rows} rows to InfluxDB")
 
 
 def query_last_timestamp(asset, currency, granularity, measurement="crypto_price"):
