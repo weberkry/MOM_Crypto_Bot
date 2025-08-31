@@ -84,7 +84,7 @@ def write_dataframe(df, measurement="crypto_price_", chunk_size=10_000):
             bucket=INFLUX_BUCKET,
             org=INFLUX_ORG,
             record=chunk,
-            data_frame_measurement_name=measurement + str(chunk.interval.iloc[0]),
+            data_frame_measurement_name=interval.iloc[0],
             data_frame_tag_columns=["asset", "currency", "interval"],
         )
 
