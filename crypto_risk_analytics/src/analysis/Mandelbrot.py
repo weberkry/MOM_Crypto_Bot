@@ -148,7 +148,7 @@ def process_raw_DF(DF):
     DF["delta"] = DF["high"].diff()
     DF["delta_log"] = log10(DF["delta"])
     DF["return"] = compute_returns(DF["high"])[0]
-    DF["return_log"] = compute_returns(DF["high"])[0]
+    DF["return_log"] = compute_returns(DF["high"])[1]
 
     #print("-----------------------------------------------------------------------")
     #print(DF.head())
