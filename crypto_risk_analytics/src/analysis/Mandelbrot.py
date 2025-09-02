@@ -366,3 +366,89 @@ class hurst:
         plt.grid(True)
         plt.show()
         
+
+
+class Hurst:
+    def __init__(self):
+        self.results = {}  # stores Hurst per time frame
+        self.Y = {}        # fitted R/S values
+        self.linfit = {}   # linear regression parameters
+        self.rs_range = {} # mean R/S per segment
+        self.subset_length = {} # subset lengths used
+
+    def rescaled_range(self, data, power=9, rolling_window=False):
+        """
+        Compute mean R/S for a dataset.
+        """
+        l = 2 ** power
+        n = int(len(data) / l)
+        R_S_per_segment = []
+
+        if rolling_window:
+            for k in range(l, len(data) + 1):
+                subset = data[k - l:k]
+                mean = np.mean(subset)
+                std = np.std(subset)
+                Y_cumsum = np.cumsum(subset - mean)
+                R = np.max(Y_cumsum) - np.min(Y_cumsum)
+                R_S_per_segment.append(R / std if std != 0 else 0)
+        else:
+            for k in range(n):
+                subset = data[k * l:(k + 1) * l]
+                mean = np.mean(subset)
+                std = np.std(subset)
+                Y_cumsum = np.cumsum(subset - mean)
+                R = np.max(Y_cumsum) - np.min(Y_cumsum)
+                R_S_per_segment.append(R / std if std != 0 else 0)
+
+        return np.mean(R_S_per_segment), l
+
+    def fit(self, data, power=9, rolling_window=False, label="default"):
+        """
+        Compute Hurst exponent for a dataset.
+        """
+        L = []
+        R_S_mean_list = []
+
+        for p in range(6, power + 1):
+            r_s_mean, l = self.rescaled_range(data=data, power=p, rolling_window=rolling_window)
+            L.append(l)
+            R_S_mean_list.append(r_s_mean)
+
+        slope, intercept, r_value, p_value, std_err = linregress(np.log(L), np.log(R_S_mean_list))
+        Y = [slope * np.log(l) + intercept for l in L]
+
+        # store results per label
+        self.results[label] = slope
+        self.Y[label] = Y
+        self.linfit[label] = (slope, intercept, p_value)
+        self.rs_range[label] = R_S_mean_list
+        self.subset_length[label] = L
+
+        return slope
+
+    def fit_multiple_timeframes(self, df, column="return", rolling_window_short=None):
+        """
+        df: pandas DataFrame with multiple resampled returns (columns)
+        column: column name or list of columns with different time frames
+        rolling_window_short: number of points to use for rolling short-term Hurst
+        Returns dict of Hurst exponents per time frame.
+        """
+        hurst_dict = {}
+
+        for col in df.columns:
+            series = df[col].dropna().values
+            if rolling_window_short and len(series) >= rolling_window_short:
+                # compute rolling Hurst over short-term windows
+                hurst_values = []
+                for i in range(0, len(series) - rolling_window_short + 1):
+                    subset = series[i:i+rolling_window_short]
+                    H = self.fit(subset, power=9, rolling_window=True, label=col)
+                    hurst_values.append(H)
+                hurst_dict[col] = np.mean(hurst_values)  # mean Hurst over rolling windows
+            else:
+                # full-series Hurst
+                H = self.fit(series, power=9, rolling_window=False, label=col)
+                hurst_dict[col] = H
+
+        return hurst_dict

@@ -27,7 +27,7 @@ def get_query_api(client):
     return client.query_api()
 
 
-def write_dataframe(df):
+def write_dataframe(df, in_bucket=INFLUX_BUCKET, measurement = "Hurst"):
     """
     Write a pandas DataFrame to InfluxDB.
     Expects columns: time, price, asset, currency, interval
@@ -41,57 +41,57 @@ def write_dataframe(df):
         raise ValueError("DataFrame must have a datetime64[ns, UTC] column named 'time'")
 
     write_api.write(
-        bucket=INFLUX_BUCKET,
+        bucket=in_bucket,
         org=INFLUX_ORG,
         record=df,
-        data_frame_measurement_name=df.interval.iloc[0],
+        data_frame_measurement_name=measurement,
         data_frame_tag_columns=["asset", "currency", "interval"],
     )
-    print(f"Wrote {len(df)} rows to InfluxDB bucket '{INFLUX_BUCKET}'")
+    print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}'")
 
 
-#def write_dataframe(df, measurement="crypto_price_", chunk_size=10_000):
-#    """
-#    Write a pandas DataFrame to InfluxDB in safe chunks to avoid timeouts.
-#    Expects:
-#      - index: datetime64[ns, UTC]
-#      - columns: price, asset, currency, interval (+ any other fields)
-#    """
-#    client = get_client()
 
-    # Use asynchronous batched writing
-    #write_api = client.write_api(
-     #   write_options=WriteOptions(
-      #      batch_size=5000,          # number of rows per batch
-       #     flush_interval=10_000,    # flush buffer every 10s
-        #    jitter_interval=2_000,    # randomize flush a little
-         #   retry_interval=5_000,     # retry wait if failed
-          #  max_retries=5,            # max retries
-           # max_retry_delay=30_000,   # max retry backoff
-            #exponential_base=2
-        #)
-    #)
+def query_returns(asset="BTC", interval="Day", start="-30d",field="returns"):
+    """
+    Query 'return' field for a specific asset & interval from InfluxDB.
+    
+    :param asset: e.g. "BTC"
+    :param interval: e.g. "Day", "Hour", "Minute"
+    :param start: time range, e.g. "-30d", "-1y", "1970-01-01T00:00:00Z"
+    :return: pandas DataFrame with time + return
+    """
+    #client = get_client()
+    #Q = client.get_query_api()
+    Q = get_query_api(get_client())
 
-    #if not df.index.dtype.kind == "M":
-     #   raise ValueError("DataFrame index must be datetime64[ns, UTC]")
+    flux = f'''
+    from(bucket: "{INFLUX_BUCKET}")
+      |> range(start: {start})
+      |> filter(fn: (r) => r["_measurement"] == "{interval}")
+      |> filter(fn: (r) => r["asset"] == "{asset}")
+      |> filter(fn: (r) => r["_field"] == "{field}")
+      |> keep(columns: ["_time", "_value", "asset", "currency", "interval"])
+    '''
 
-    # Split DF into chunks
-    #total_rows = len(df)
-    #for start in range(0, total_rows, chunk_size):
-     #   chunk = df.iloc[start:start+chunk_size]
+    tables = Q.query(org=INFLUX_ORG, query=flux)
 
-      #  write_api.write(
-       #     bucket=INFLUX_BUCKET,
-        #    org=INFLUX_ORG,
-         #   record=chunk,
-          #  data_frame_measurement_name=df.interval.iloc[0],
-           # data_frame_tag_columns=["asset", "currency", "interval"],
-        #)
+    # convert FluxTable → pandas DataFrame
+    records = []
+    for table in tables:
+        for record in table.records:  # type: FluxRecord
+            records.append({
+                "time": record["_time"],
+                field: record["_value"],
+                "asset": record["asset"],
+                "currency": record["currency"],
+                "interval": record["interval"],
+            })
 
-        #print(f"Wrote rows {start}–{start+len(chunk)-1} "
-         #     f"({len(chunk)}) to InfluxDB bucket '{INFLUX_BUCKET}'")
+    df = pd.DataFrame(records)
+    if not df.empty:
+        df.set_index("time", inplace=True)
 
-   # print(f"Finished writing {total_rows} rows to InfluxDB")
+    return df
 
 
 def query_last_timestamp(asset, currency, granularity, measurement="crypto_price"):
