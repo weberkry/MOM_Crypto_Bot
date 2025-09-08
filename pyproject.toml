@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mom"
+version = "0.1.0"
+description = "Crypto risk analytics and trading tools"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+
+dependencies = [
+    "pandas",
+    "numpy",
+    "scipy",
+    "influxdb-client",
+    "yfinance",
+    "matplotlib",
+    "tqdm",
+    "requests",
+    "ccxt",
+    "datetime"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
