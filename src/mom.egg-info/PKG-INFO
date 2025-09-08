@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: mom
+Version: 0.1.0
+Summary: Crypto risk analytics and trading tools
+License: MIT
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: influxdb-client
+Requires-Dist: yfinance
+Requires-Dist: matplotlib
+Requires-Dist: tqdm
+Requires-Dist: requests
+Requires-Dist: ccxt
+Requires-Dist: datetime
+
+# MOM_Crypto_Bot
