@@ -78,7 +78,7 @@ def update():
                     print(f"No new data for {asset} ({interval})")
                     continue
 
-                influx.write_dataframe(df)
+                influx.write_dataframe(df, measurement=measurement)
                 print(f"Updated {asset} ({interval}) with {len(df)} new rows")
 
 

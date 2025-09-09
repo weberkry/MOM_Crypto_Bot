@@ -3,7 +3,7 @@ from mom import Mandelbrot
 from influxdb_client import Point
 from datetime import datetime, timezone
 
-for c in ["ETH"]:
+for c in ["BTC"]:
     MIN, HOUR, DAY, WEEK, MONTH = Mandelbrot.historical_datasets(crypto=c, curr="EUR")
     for INTERVAL in [WEEK,MONTH]:
         influx.write_dataframe(INTERVAL)
@@ -13,7 +13,7 @@ for c in ["ETH"]:
 
         for start in range(0, total_rows, chunk_size):
             chunk = INTERVAL.iloc[start:start + chunk_size]
-            influx.write_dataframe(chunk)
+            influx.write_dataframe(chunk, measurement=INTERVAL.interval.iloc[0])
             print(f"Wrote rows {start}-{start+len(chunk)-1} ")
 	
 	
