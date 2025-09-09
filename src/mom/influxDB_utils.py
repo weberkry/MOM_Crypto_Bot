@@ -35,11 +35,14 @@ def write_dataframe(df, in_bucket=INFLUX_BUCKET, measurement = "Hurst"):
     client = get_client()
     write_api = get_write_api(client)
 
+
     # Ensure time column is datetime with timezone
     #
     if not df.index.dtype.kind == "M":
         raise ValueError("DataFrame must have a datetime64[ns, UTC] column named 'time'")
+    df.index.name = "_time"
 
+    print(f"Writing to InfluxDB bucket '{in_bucket}-{measurement}'")
     write_api.write(
         bucket=in_bucket,
         org=INFLUX_ORG,
@@ -47,7 +50,7 @@ def write_dataframe(df, in_bucket=INFLUX_BUCKET, measurement = "Hurst"):
         data_frame_measurement_name=measurement,
         data_frame_tag_columns=["asset", "currency", "interval"],
     )
-    print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}'")
+    print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}-{measurement}'")
 
 
 
@@ -277,7 +280,7 @@ def backup_csv(output_dir="backup", bucket=INFLUX_BUCKET):
                           |> range(start: {start.isoformat()}, stop: {end.isoformat()})
                           |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
                           |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                          |> keep(columns: ["_time","asset","currency","interval","price","volume"])
+                          |> keep(columns: ["_time","asset","currency","interval","high","delta","delta_log","return","return_log","volume"])
                         '''
                         df = query_api.query_data_frame(flux)
                         if not df.empty:
@@ -285,7 +288,7 @@ def backup_csv(output_dir="backup", bucket=INFLUX_BUCKET):
                             filename = f"{bucket}_{asset}_{interval}_{start_year}_{month:02d}.csv"
                             filepath = os.path.join(output_dir, filename)
                             df.to_csv(filepath, index=False)
-                            print(f"✅ Saved {filepath} ({len(df)} rows)")
+                            print(f"Saved {filepath} ({len(df)} rows)")
                             saved_files.append(filepath)
                     start_year += 1
             else:
@@ -298,7 +301,7 @@ def backup_csv(output_dir="backup", bucket=INFLUX_BUCKET):
                       |> range(start: {start.isoformat()}, stop: {end.isoformat()})
                       |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
                       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                      |> keep(columns: ["_time","asset","currency","interval","price","volume"])
+                      |> keep(columns: ["_time","asset","currency","interval","high","volume","return","return_log","delta","delta_log"])
                     '''
                     df = query_api.query_data_frame(flux)
                     if not df.empty:
@@ -310,3 +313,23 @@ def backup_csv(output_dir="backup", bucket=INFLUX_BUCKET):
                         saved_files.append(filepath)
 
     return saved_files
+
+
+def write_from_backup(directory = "/home/christiane/git/MOM_Crypto_Bot/src/data_fetch/backup/"):
+    all_entries = os.listdir(directory)
+    files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    for f in files:
+        print(f)
+        DF = pd.read_csv(directory+f)
+        DF = DF.set_index("_time")
+        DF.index = pd.to_datetime(DF.index, utc=True)
+
+        for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
+            if col in DF.columns:
+                DF[col] = pd.to_numeric(DF[col], errors="coerce")
+        # Ensure tag columns are strings
+        for col in ["asset", "currency", "interval"]:
+            if col in DF.columns:
+                DF[col] = DF[col].astype(str)
+    
+        influx.write_dataframe(DF, measurement=DF.interval.iloc[0])

@@ -39,6 +39,7 @@ def historical_data(crypto="BTC",
     hist_data_cdd.columns = map(str.lower, hist_data_cdd.columns)
     hist_data_cdd["unix"] = hist_data_cdd['unix'] // 1000    #unix is displayed in milliseconds. To match yfinance it must be displayed in sec.
     hist_data_cdd["volume"] = hist_data_cdd[f"volume {crypto.lower()}"]
+    hist_data_cdd["volume"] = hist_data_cdd["volume"].astype(float)
 
     #hist_data_delta_cdd = process_raw_DF(hist_data_cdd)
     #print("---cdd---")
@@ -108,9 +109,33 @@ def historical_datasets(crypto="BTC",
     MONTH["interval"] = "Month"
     MONTH = MONTH.set_index("date")
 
+    MIN = fill_nas(MIN)
+    HOUR = fill_nas(HOUR)
+    DAY = fill_nas(DAY)
+    WEEK = fill_nas(WEEK)
+    MONTH = fill_nas(MONTH)
+
     return MIN, HOUR, DAY, WEEK, MONTH 
 
+
+def fill_nas(DF):
+    DF.index = pd.to_datetime(DF.index, utc=True)
+    DF["volume"] = pd.to_numeric(DF["volume"], errors="coerce").astype(float)
+    DF["volume"].fillna(0.0, inplace=True)
+
+    DF["delta"] = pd.to_numeric(DF["delta"], errors="coerce").astype(float)
+    DF["delta"].fillna(0.0, inplace=True)
+
+    DF["delta_log"] = pd.to_numeric(DF["delta_log"], errors="coerce").astype(float)
+    DF["delta_log"].fillna(0.0, inplace=True)
+
+    DF["return"] = pd.to_numeric(DF["return"], errors="coerce").astype(float)
+    DF["return"].fillna(0.0, inplace=True)
+
+    DF["return_log"] = pd.to_numeric(DF["return_log"], errors="coerce").astype(float)
+    DF["return_log"].fillna(0.0, inplace=True)
     
+    return DF
 
 
 def reset_index(df):
