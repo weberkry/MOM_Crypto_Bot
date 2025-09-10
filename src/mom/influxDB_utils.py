@@ -4,6 +4,7 @@ from influxdb_client import InfluxDBClient, WriteOptions
 from influxdb_client.client.write_api import SYNCHRONOUS
 import pandas as pd
 from datetime import datetime, timezone, timedelta
+from mom import Mandelbrot
 
 # Load env from project root
 load_dotenv()
@@ -320,10 +321,11 @@ def write_from_backup(directory = "/home/christiane/git/MOM_Crypto_Bot/src/data_
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
     for f in files:
         print(f)
+        
         DF = pd.read_csv(directory+f)
         DF = DF.set_index("_time")
         DF.index = pd.to_datetime(DF.index, utc=True)
-
+        print(DF.columns)
         for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
             if col in DF.columns:
                 DF[col] = pd.to_numeric(DF[col], errors="coerce")
@@ -331,5 +333,8 @@ def write_from_backup(directory = "/home/christiane/git/MOM_Crypto_Bot/src/data_
         for col in ["asset", "currency", "interval"]:
             if col in DF.columns:
                 DF[col] = DF[col].astype(str)
+
+        DF = Mandelbrot.fill_nas(DF)
+        
     
-        influx.write_dataframe(DF, measurement=DF.interval.iloc[0])
+        write_dataframe(DF, measurement=DF.interval.iloc[0])

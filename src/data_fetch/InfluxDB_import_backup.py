@@ -3,4 +3,4 @@ from mom import influxDB_utils as influx
 
 
 if __name__ == "__main__":
-    influx.write_from_backup(directory='"/home/weberkry/git/MOM_Crypto_Bot/src/data_fetch/backup/"')
+    influx.write_from_backup(directory='/home/christiane/git/MOM_Crypto_Bot/src/data_fetch/backup/')

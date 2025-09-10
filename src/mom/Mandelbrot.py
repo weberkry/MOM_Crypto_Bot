@@ -120,20 +120,9 @@ def historical_datasets(crypto="BTC",
 
 def fill_nas(DF):
     DF.index = pd.to_datetime(DF.index, utc=True)
-    DF["volume"] = pd.to_numeric(DF["volume"], errors="coerce").astype(float)
-    DF["volume"].fillna(0.0, inplace=True)
-
-    DF["delta"] = pd.to_numeric(DF["delta"], errors="coerce").astype(float)
-    DF["delta"].fillna(0.0, inplace=True)
-
-    DF["delta_log"] = pd.to_numeric(DF["delta_log"], errors="coerce").astype(float)
-    DF["delta_log"].fillna(0.0, inplace=True)
-
-    DF["return"] = pd.to_numeric(DF["return"], errors="coerce").astype(float)
-    DF["return"].fillna(0.0, inplace=True)
-
-    DF["return_log"] = pd.to_numeric(DF["return_log"], errors="coerce").astype(float)
-    DF["return_log"].fillna(0.0, inplace=True)
+    for c in ["volume","delta","delta_log","return","return_log","high"]:
+        DF[c] = pd.to_numeric(DF[c], errors="coerce").astype(float)
+        DF[c] = DF[c].fillna(0.0)
     
     return DF
 

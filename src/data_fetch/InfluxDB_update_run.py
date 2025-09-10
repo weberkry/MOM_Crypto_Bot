@@ -8,7 +8,7 @@ from mom import Mandelbrot
 
 
 ## Config
-ASSETS = ["BTC", "ETH"]
+ASSETS = ["BTC"]
 CURRENCIES = ["EUR"]
 GRANULARITIES = {
     "Day": "1d",
@@ -58,6 +58,8 @@ def fetch_data(asset: str,currency: str, interval: str, start: datetime) -> pd.D
     df["interval"] = interval
     for i in ["volume", "high","low","delta","delta_log","return","return_log"]:
         df[i] = df[i].astype(float)
+
+    df = Mandelbrot.fill_nas(df)
     #print(df.head())
     return df
 
