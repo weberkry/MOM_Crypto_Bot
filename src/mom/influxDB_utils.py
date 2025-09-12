@@ -46,7 +46,7 @@ def write_dataframe(df, in_bucket=INFLUX_BUCKET, measurement = "Hurst"):
         raise ValueError("DataFrame must have a datetime64[ns, UTC] column named 'time'")
     df.index.name = "_time"
 
-    print(f"Writing to InfluxDB bucket '{in_bucket}-{measurement}'")
+    #print(f"Writing to InfluxDB bucket '{in_bucket}-{measurement}'")
     write_api.write(
         bucket=in_bucket,
         org=INFLUX_ORG,
@@ -54,7 +54,7 @@ def write_dataframe(df, in_bucket=INFLUX_BUCKET, measurement = "Hurst"):
         data_frame_measurement_name=measurement,
         data_frame_tag_columns=["asset", "currency", "interval"],
     )
-    print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}-{measurement}'")
+    print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}---->{measurement}'")
 
 
 
@@ -269,7 +269,7 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
             now = datetime.now().year
             if interval == "Minute":
                 # Monthly chunks
-                start_year = 2015
+                start_year = 2019
                 start_month = 1
                 while start_year <= now:
                     for month in range(1, 13):
@@ -339,5 +339,6 @@ def write_from_backup(directory = BACKUP_DIR):
 
         DF = Mandelbrot.fill_nas(DF)
         
+        #print(f,", measurement:",DF.interval.iloc[0])
     
         write_dataframe(DF, measurement=DF.interval.iloc[0])

@@ -47,7 +47,10 @@ def historical_data(crypto=ASSET,
 
     hist_data_cdd = pd.read_csv(url_cdd, skiprows=1) 
     hist_data_cdd.columns = map(str.lower, hist_data_cdd.columns)
+    print("cdd col:",hist_data_cdd.columns)
+    
     hist_data_cdd["unix"] = hist_data_cdd['unix'] // 1000    #unix is displayed in milliseconds. To match yfinance it must be displayed in sec.
+    hist_data_cdd["date"] = pd.to_datetime(hist_data_cdd["date"], utc=True)
     hist_data_cdd["volume"] = hist_data_cdd[f"volume {crypto.lower()}"]
     hist_data_cdd["volume"] = hist_data_cdd["volume"].astype(float)
 
@@ -66,6 +69,8 @@ def historical_data(crypto=ASSET,
 
     crypto_chart = yf.Ticker(f"{crypto}-{curr}")
     hist_data_yf = reset_index(crypto_chart.history(period="max", interval=gran_LOOKUP[gran]))
+    print("yfinance",hist_data_yf.date.dtype.kind == "M")
+    print("cdd",hist_data_cdd.date.dtype.kind == "M")
 
     print(f"downloading the {curr} price/{gran} for {crypto} from yfinance....")
 
@@ -75,7 +80,7 @@ def historical_data(crypto=ASSET,
 
 
     #merge cdd and yf
-    hist_data = pd.merge(hist_data_yf, hist_data_cdd, on='unix', how='outer').sort_values('unix').reset_index(drop=True)
+    hist_data = pd.merge(hist_data_yf, hist_data_cdd, on='date', how='outer').sort_values('date').reset_index(drop=True)
     hist_data = process_raw_DF(hist_data)
     hist_data["currency"] = curr
     hist_data["asset"] = crypto
@@ -85,9 +90,63 @@ def historical_data(crypto=ASSET,
     return hist_data
 
 
-def historical_datasets(crypto=ASSET,
-                        curr = CURRENCY):
+def update_data(crypto=ASSET,
+                    curr = CURRENCY,
+                    gran= "d"):
+    
+    
+    col = ["unix", "date", "high", "low"]
+
+
+    #2. collect data from yfinance
+    import yfinance as yf
+
+    gran_LOOKUP = {
+        "d": "1d",
+        "h": "60m",
+        "m": "1m"
+    }
+
+    crypto_chart = yf.Ticker(f"{crypto}-{curr}")
+    upd_data = reset_index(crypto_chart.history(period="2d", interval=gran_LOOKUP[gran]))
+    
+
+    print(f"downloading the {curr} price/{gran} for {crypto} from yfinance....")
+    #print(upd_data.date.dtype.kind == "M")
+    #print(upd_data)
+
+    #print("---yf---")
+    #print(hist_data_yf.head())
+
+
+    
+    upd_data = process_raw_DF(upd_data)
+    
+    upd_data["currency"] = curr
+    upd_data["asset"] = crypto
+
+    print(upd_data.head())
+
+    return upd_data
+
+def update_datasets(crypto=ASSET,curr = CURRENCY): 
+    MIN  = update_data(crypto=crypto, curr = curr, gran = "m")
+    MIN["interval"] = "Minute"
+    MIN = MIN.set_index("date")
+    
+    MIN = fill_nas(MIN)
+    #print('-----------------------------DF Tail Minute')
+    #print(MIN.tail())
+    DAY  = update_data(crypto=crypto, curr = curr, gran = "d")
+    DAY["interval"] = "Day"
+    DAY = DAY.set_index("date")
+    DAY = fill_nas(DAY)
+
+    return MIN, DAY
+
+def historical_datasets(crypto=ASSET,curr = CURRENCY):
     MIN  = historical_data(crypto=crypto, curr = curr, gran = "m")
+    
     #print('-----------------------------DF Tail Minute')
     #print(MIN.tail())
     DAY  = historical_data(crypto=crypto, curr = curr, gran = "d")
@@ -149,7 +208,7 @@ def reset_index(df):
 # Processing Output from historical_data() for further analysis
 def process_raw_DF(DF):
     from datetime import datetime, timezone
-    col = ["unix", "date","volume", "high","low","delta","delta_log","return","return_log"]
+    col = ["date","volume", "high","low","delta","delta_log","return","return_log"]
     #print("-----------------------------------------------------------------------")
     #print(DF.head())
     if "high_x" in DF.columns:
@@ -159,13 +218,13 @@ def process_raw_DF(DF):
         DF['volume'] = DF[['volume_x','volume_y']].mean(axis=1, skipna=True)
 
     #convert Unix timestamp to readable date-time format
-    DF['date'] = pd.to_datetime(DF['unix'], unit='s')
-    rfc3339 = []
-    for i in DF["unix"]:
-        dt = datetime.fromtimestamp(i, tz= timezone.utc)
-        date = dt.isoformat().replace("+00:00","Z")
-        rfc3339.append(date)
-    DF["date_rfc"] = rfc3339
+    #DF['date'] = pd.to_datetime(DF['unix'], unit='s')
+    #rfc3339 = []
+    #for i in DF["unix"]:
+    #    dt = datetime.fromtimestamp(i, tz= timezone.utc)
+    #    date = dt.isoformat().replace("+00:00","Z")
+    #    rfc3339.append(date)
+    #DF["date_rfc"] = rfc3339
 
     #Calculate deltas for data points
 
@@ -173,6 +232,7 @@ def process_raw_DF(DF):
     DF["delta_log"] = log10(DF["delta"])
     DF["return"] = compute_returns(DF["high"])[0]
     DF["return_log"] = compute_returns(DF["high"])[1]
+    #DF = DF.set_index("date")
 
     #print("-----------------------------------------------------------------------")
     #print(DF.head())

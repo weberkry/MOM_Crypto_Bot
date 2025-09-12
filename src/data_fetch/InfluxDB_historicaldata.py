@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 
 for c in ["BTC"]:
     MIN, HOUR, DAY, WEEK, MONTH = Mandelbrot.historical_datasets(crypto=c, curr="EUR")
-    for INTERVAL in [WEEK,MONTH]:
-        influx.write_dataframe(INTERVAL, measurement=INTERVAL.interval.iloc[0])
-    for INTERVAL in [DAY,HOUR,MIN]:
+    #for INTERVAL in [WEEK,MONTH]:
+    #    influx.write_dataframe(INTERVAL, measurement=INTERVAL.interval.iloc[0])
+    for INTERVAL in [DAY,MIN]:
         chunk_size = 1000
         total_rows = len(INTERVAL)
 
