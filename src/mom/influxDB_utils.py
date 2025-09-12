@@ -325,7 +325,7 @@ def write_from_backup(directory = BACKUP_DIR):
     for f in files:
         print(f)
         
-        DF = pd.read_csv(directory+f)
+        DF = pd.read_csv(directory+"/"+f)
         DF = DF.set_index("_time")
         DF.index = pd.to_datetime(DF.index, utc=True)
         #print(DF.columns)
