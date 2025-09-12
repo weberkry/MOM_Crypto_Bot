@@ -8,12 +8,22 @@ import matplotlib.pyplot as plt
 import scipy
 from scipy.stats import linregress
 
+import os
+from dotenv import load_dotenv
+
+# Load env from project root
+load_dotenv()
+
+#the following entries are expected in the MOM_Crypto_Bot/.env
+ASSET = os.getenv("ASSET")
+CURRENCY = os.getenv("CURRENCY")
+
 
 
 #collect historical data via cryptodatadownload an yfinace and merge them together
 
-def historical_data(crypto="BTC",
-                    curr = "USD",
+def historical_data(crypto=ASSET,
+                    curr = CURRENCY,
                     gran= "d"):
     
     #gran = ["minute", "hour", "d"]
@@ -75,8 +85,8 @@ def historical_data(crypto="BTC",
     return hist_data
 
 
-def historical_datasets(crypto="BTC",
-                        curr = "USD"):
+def historical_datasets(crypto=ASSET,
+                        curr = CURRENCY):
     MIN  = historical_data(crypto=crypto, curr = curr, gran = "m")
     #print('-----------------------------DF Tail Minute')
     #print(MIN.tail())

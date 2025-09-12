@@ -6,13 +6,19 @@ from datetime import datetime, timezone, timedelta
 from mom import influxDB_utils as influx
 from mom import Mandelbrot
 
+import os
+from dotenv import load_dotenv
 
-## Config
-ASSETS = ["BTC"]
-CURRENCIES = ["EUR"]
+# Load env from project root
+load_dotenv()
+
+# the following entries are expected in the MOM_Crypto_Bot/.env
+ASSET = os.getenv("ASSET")
+CURRENCY = os.getenv("CURRENCY")
+
+# define interval
 GRANULARITIES = {
     "Day": "1d",
-    "Hour": "1h",
     "Minute": "1m",
     # "Week": not directly supported in yfinance → use 1d and resample
 }
@@ -65,8 +71,8 @@ def fetch_data(asset: str,currency: str, interval: str, start: datetime) -> pd.D
 
 
 def update():
-    for curr in CURRENCIES:
-        for asset in ASSETS:
+    for curr in [CURRENCY]:
+        for asset in [ASSET]:
             for interval, gran in GRANULARITIES.items():
                 measurement = f"{interval}"
                 print(gran, interval)

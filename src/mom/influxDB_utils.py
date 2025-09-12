@@ -9,10 +9,13 @@ from mom import Mandelbrot
 # Load env from project root
 load_dotenv()
 
+#the following entries are expected in the MOM_Crypto_Bot/.env
 INFLUX_URL = os.getenv("INFLUX_URL")
 INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
 INFLUX_ORG = os.getenv("INFLUX_ORG")
 INFLUX_BUCKET = os.getenv("INFLUX_BUCKET")
+
+BACKUP_DIR = os.getenv("BACKUP_DIR")
 
 
 def get_client():
@@ -235,7 +238,7 @@ def query_last_timestamp(asset, currency, granularity, measurement="crypto_price
 
 
 
-def backup_csv(output_dir="backup", bucket=INFLUX_BUCKET):
+def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
     """
     Backup InfluxDB data into CSVs.
     - Day/Hour/Week: yearly
@@ -316,7 +319,7 @@ def backup_csv(output_dir="backup", bucket=INFLUX_BUCKET):
     return saved_files
 
 
-def write_from_backup(directory = "/home/christiane/git/MOM_Crypto_Bot/src/data_fetch/backup/"):
+def write_from_backup(directory = BACKUP_DIR):
     all_entries = os.listdir(directory)
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
     for f in files:
@@ -325,7 +328,7 @@ def write_from_backup(directory = "/home/christiane/git/MOM_Crypto_Bot/src/data_
         DF = pd.read_csv(directory+f)
         DF = DF.set_index("_time")
         DF.index = pd.to_datetime(DF.index, utc=True)
-        print(DF.columns)
+        #print(DF.columns)
         for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
             if col in DF.columns:
                 DF[col] = pd.to_numeric(DF[col], errors="coerce")
