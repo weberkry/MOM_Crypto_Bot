@@ -238,7 +238,7 @@ def query_last_timestamp(asset, currency, granularity, measurement="crypto_price
 
 
 
-def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
+def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET, year="all"):
     """
     Backup InfluxDB data into CSVs.
     - Day/Hour/Week: yearly
@@ -268,10 +268,39 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
             # Determine start/end periods
             now = datetime.now().year
             if interval == "Minute":
-                # Monthly chunks
-                start_year = 2019
-                start_month = 1
-                while start_year <= now:
+                if year == "all":
+                    # Monthly chunks
+                    start_year = 2019
+                    start_month = 1
+                    while start_year <= now:
+                        for month in range(1, 13):
+                            start = datetime(start_year, month, 1, tzinfo=timezone.utc)
+                            if month == 12:
+                                end = datetime(start_year+1, 1, 1, tzinfo=timezone.utc)
+                            else:
+                                end = datetime(start_year, month+1, 1, tzinfo=timezone.utc)
+
+                            flux = f'''
+                            from(bucket: "{bucket}")
+                            |> range(start: {start.isoformat()}, stop: {end.isoformat()})
+                            |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+                            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                            |> keep(columns: ["_time","asset","currency","interval","high","delta","delta_log","return","return_log","volume"])
+                            '''
+                            df = query_api.query_data_frame(flux)
+                            if not df.empty:
+                                df["_time"] = pd.to_datetime(df["_time"])
+                                filename = f"{bucket}_{asset}_{interval}_{start_year}_{month:02d}.csv"
+                                filepath = os.path.join(output_dir, filename)
+                                df.to_csv(filepath, index=False)
+                                print(f"Saved {filepath} ({len(df)} rows)")
+                                saved_files.append(filepath)
+                        start_year += 1
+                else:
+                        # Monthly chunks
+                    start_year = int(year)
+                    start_month = 1
+                    
                     for month in range(1, 13):
                         start = datetime(start_year, month, 1, tzinfo=timezone.utc)
                         if month == 12:
@@ -281,11 +310,11 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
 
                         flux = f'''
                         from(bucket: "{bucket}")
-                          |> range(start: {start.isoformat()}, stop: {end.isoformat()})
-                          |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
-                          |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                          |> keep(columns: ["_time","asset","currency","interval","high","delta","delta_log","return","return_log","volume"])
-                        '''
+                        |> range(start: {start.isoformat()}, stop: {end.isoformat()})
+                        |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+                        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                        |> keep(columns: ["_time","asset","currency","interval","high","delta","delta_log","return","return_log","volume"])
+                            '''
                         df = query_api.query_data_frame(flux)
                         if not df.empty:
                             df["_time"] = pd.to_datetime(df["_time"])
@@ -294,19 +323,40 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
                             df.to_csv(filepath, index=False)
                             print(f"Saved {filepath} ({len(df)} rows)")
                             saved_files.append(filepath)
-                    start_year += 1
+                        
+
             else:
+                if year == "all":
                 # Yearly chunks
-                for year in range(2015, now+1):
-                    start = datetime(year, 1, 1, tzinfo=timezone.utc)
-                    end = datetime(year+1, 1, 1, tzinfo=timezone.utc)
+                    for y in range(2015, now+1):
+                        start = datetime(y, 1, 1, tzinfo=timezone.utc)
+                        end = datetime(y+1, 1, 1, tzinfo=timezone.utc)
+                        flux = f'''
+                        from(bucket: "{bucket}")
+                        |> range(start: {start.isoformat()}, stop: {end.isoformat()})
+                        |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+                        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                        |> keep(columns: ["_time","asset","currency","interval","high","volume","return","return_log","delta","delta_log"])
+                        '''
+                        df = query_api.query_data_frame(flux)
+                        if not df.empty:
+                            df["_time"] = pd.to_datetime(df["_time"])
+                            filename = f"{bucket}_{asset}_{interval}_{y}.csv"
+                            filepath = os.path.join(output_dir, filename)
+                            df.to_csv(filepath, index=False)
+                            print(f"Saved {filepath} ({len(df)} rows)")
+                            saved_files.append(filepath)
+                else:
+                    
+                    start = datetime(int(year), 1, 1, tzinfo=timezone.utc)
+                    end = datetime(int(year)+1, 1, 1, tzinfo=timezone.utc)
                     flux = f'''
                     from(bucket: "{bucket}")
-                      |> range(start: {start.isoformat()}, stop: {end.isoformat()})
-                      |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
-                      |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                      |> keep(columns: ["_time","asset","currency","interval","high","volume","return","return_log","delta","delta_log"])
-                    '''
+                    |> range(start: {start.isoformat()}, stop: {end.isoformat()})
+                    |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
+                    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                    |> keep(columns: ["_time","asset","currency","interval","high","volume","return","return_log","delta","delta_log"])
+                        '''
                     df = query_api.query_data_frame(flux)
                     if not df.empty:
                         df["_time"] = pd.to_datetime(df["_time"])
@@ -315,6 +365,7 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
                         df.to_csv(filepath, index=False)
                         print(f"Saved {filepath} ({len(df)} rows)")
                         saved_files.append(filepath)
+
 
     return saved_files
 
