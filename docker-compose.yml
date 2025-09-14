@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   influxdb:
     image: influxdb:2.7
@@ -8,17 +6,14 @@ services:
     ports:
       - "8086:8086"
     volumes:
-      - ./data/influxdb_data:/var/lib/influxdb2
-      - ./data/influxdb_config:/etc/influxdb2
+      - influxdb_data:/var/lib/influxdb2
     environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USR}
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PWD}
-      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORG}
-      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
-    networks:
-      - monitoring
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USR}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PWD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN}
 
   telegraf:
     image: telegraf:1.29
@@ -26,10 +21,9 @@ services:
     restart: always
     depends_on:
       - influxdb
+    command: telegraf --config /etc/telegraf/telegraf.conf
     volumes:
       - ./monitoring/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-    networks:
-      - monitoring
 
   grafana:
     image: grafana/grafana:10.4.2
@@ -38,15 +32,13 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./data/grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRF_USR}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRF_PWD}
+      GF_SECURITY_ADMIN_USER: ${GRF_USR}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRF_PWD}
     depends_on:
       - influxdb
-    networks:
-      - monitoring
 
-networks:
-  monitoring:
+volumes:
+  influxdb_data:
+  grafana_data:
