@@ -319,10 +319,19 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET):
     return saved_files
 
 
-def write_from_backup(directory = BACKUP_DIR):
+def write_from_backup(directory = BACKUP_DIR, year="all"):
     all_entries = os.listdir(directory)
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+    #print(year)
+    if year == "all":
+            files = files
+    else:
+        files = [f for f in files if year in f]
+        #print(files)
+    
     for f in files:
+        #print(year in f)
+        
         print(f)
         
         DF = pd.read_csv(directory+"/"+f)
