@@ -108,7 +108,7 @@ def update_data(crypto=ASSET,
     }
 
     crypto_chart = yf.Ticker(f"{crypto}-{curr}")
-    upd_data = reset_index(crypto_chart.history(period="2d", interval=gran_LOOKUP[gran]))
+    upd_data = reset_index(crypto_chart.history(period="7d", interval=gran_LOOKUP[gran]))
     
 
     print(f"downloading the {curr} price/{gran} for {crypto} from yfinance....")

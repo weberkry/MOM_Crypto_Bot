@@ -101,25 +101,26 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns"):
     return df
 
 
-def query_last_timestamp(asset, currency, granularity, measurement="crypto_price"):
+def get_last_timestamp(measurement: str, asset: str, currency: str) -> datetime:
     """
-    Returns the most recent timestamp for a given asset/currency/granularity.
+    Query InfluxDB to get the most recent timestamp for a measurement/asset/currency.
     """
-    query = f"""
+    Q = get_query_api(get_client())
+    flux = f"""
     from(bucket: "{INFLUX_BUCKET}")
-      |> range(start: -10y)
+      |> range(start: 0)
       |> filter(fn: (r) => r._measurement == "{measurement}")
       |> filter(fn: (r) => r.asset == "{asset}")
       |> filter(fn: (r) => r.currency == "{currency}")
-      |> filter(fn: (r) => r.granularity == "{granularity}")
-      |> keep(columns: ["_time"])
-      |> sort(columns: ["_time"], desc: true)
-      |> limit(n:1)
+      |> filter(fn: (r) => r._field == "high")
+      |> last()
     """
-    tables = query_api.query(query, org=INFLUX_ORG)
-    if tables and tables[0].records:
-        return tables[0].records[0].get_time()
-    return None
+    tables = Q.query(org=INFLUX_ORG, query=flux)
+    if not tables or not tables[0].records:
+        return None
+    
+    #print(measurement,"last entry:",tables[0].records[0].get_time())
+    return tables[0].records[0].get_time()
 
 
 #def backup_to_csv(output_dir="backup", bucket=INFLUX_BUCKET):
@@ -369,11 +370,39 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET, year="all"):
 
     return saved_files
 
+def backup_hurst(bucket=INFLUX_BUCKET,output_dir=BACKUP_DIR):
+
+    client = get_client()
+    query_api = client.query_api()
+
+    flux = f'''
+    from(bucket: "{bucket}")
+    |> range(start:0)
+    |> filter(fn: (r) => r["_measurement"] == "Hurst")
+    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+    '''
+    
+    df = query_api.query_data_frame(flux)
+    if not df.empty:
+        df["_time"] = pd.to_datetime(df["_time"])
+        filename = f"{bucket}_hurst.csv"
+        filepath = os.path.join(output_dir, filename)
+        df.to_csv(filepath, index=False)
+        print(f"Saved {filepath} ({len(df)} rows)")
+                                
+
 
 def write_from_backup(directory = BACKUP_DIR, year="all"):
     all_entries = os.listdir(directory)
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-    #print(year)
+
+    
+    #prices data files
+    files = [f for f in files if "hurst" not in f]
+
+    #hurst
+    hurst_files = [f for f in files if "hurst" in f]
+
     if year == "all":
             files = files
     else:
@@ -392,6 +421,8 @@ def write_from_backup(directory = BACKUP_DIR, year="all"):
         for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
             if col in DF.columns:
                 DF[col] = pd.to_numeric(DF[col], errors="coerce")
+            else:
+                DF[col] = 0.0
         # Ensure tag columns are strings
         for col in ["asset", "currency", "interval"]:
             if col in DF.columns:
