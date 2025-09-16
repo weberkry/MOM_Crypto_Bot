@@ -43,7 +43,7 @@ def get_hurst(asset=ASSET, currency=CURRENCY):
 
     df["date"] = datetime.now(timezone.utc)
     df = df.set_index("date")
-    influx.write_dataframe(df,measurement="Hurst")
+    influx.write_hurst(df)
     
     return df
 
@@ -66,10 +66,12 @@ def get_hurst_historic(asset=ASSET,currency = CURRENCY, end= influx.get_last_tim
     #maybe adjust for minute in min_before
     #
     for day in dates:
-        print(day)
+        print("calculating Hurst for: ",day)
         min_before = MIN[MIN.index < day.isoformat()]
         #hour_before = HOUR[HOUR.index < day]
         day_before = DAY[DAY.index < day.isoformat()]
+        #print("MIN: ",min_before.head())
+        #print("DAY: ",day_before.head())
         #rescaled range method
         m = Mandelbrot.hurst()
         m.fit(data=min_before["delta"], power=11, rolling_window="true")
@@ -81,16 +83,24 @@ def get_hurst_historic(asset=ASSET,currency = CURRENCY, end= influx.get_last_tim
         d.fit(data=day_before["delta"], power=8, rolling_window="false")
 
 
-        df = pd.DataFrame({
-            "asset": [asset, asset],
-            "currency": [currency, currency],
-            "interval": ["Minute", "Day"],
-            "hurst": [m.hurst, d.hurst],
-            "date": [day, day]})
-
+        MIN_hurst = pd.DataFrame({
+            "asset": [asset],
+            "currency": [currency],
+            "interval": ["Minute"],
+            "hurst": [m.hurst],
+            "date": [day]})
+        MIN_hurst = MIN_hurst.set_index("date")
+        
+        DAY_hurst = pd.DataFrame({
+            "asset": [asset],
+            "currency": [currency],
+            "interval": ["Day"],
+            "hurst": [d.hurst],
+            "date": [day]})
+        DAY_hurst = DAY_hurst.set_index("date")
 
         
-        df = df.set_index("date")
-        influx.write_dataframe(df,measurement="Hurst")
+        influx.write_hurst(MIN_hurst)
+        influx.write_hurst(DAY_hurst)
     
     

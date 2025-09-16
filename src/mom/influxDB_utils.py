@@ -31,7 +31,7 @@ def get_query_api(client):
     return client.query_api()
 
 
-def write_dataframe(df, in_bucket=INFLUX_BUCKET, measurement = "Hurst"):
+def write_dataframe(df, in_bucket=INFLUX_BUCKET):
     """
     Write a pandas DataFrame to InfluxDB.
     Expects columns: time, price, asset, currency, interval
@@ -51,10 +51,36 @@ def write_dataframe(df, in_bucket=INFLUX_BUCKET, measurement = "Hurst"):
         bucket=in_bucket,
         org=INFLUX_ORG,
         record=df,
-        data_frame_measurement_name=measurement,
-        data_frame_tag_columns=["asset", "currency", "interval"],
+        data_frame_measurement_name=df.interval.iloc[0],
+        data_frame_tag_columns=["asset", "currency","interval"],
     )
-    print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}---->{measurement}'")
+    print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}---->{df.interval.iloc[0]}'")
+
+
+def write_hurst(df):
+    """
+    Write a pandas DataFrame to InfluxDB.
+    Expects columns: time, price, asset, currency, interval
+    """
+    client = get_client()
+    write_api = get_write_api(client)
+
+
+    # Ensure time column is datetime with timezone
+    #
+    if not df.index.dtype.kind == "M":
+        raise ValueError("DataFrame must have a datetime64[ns, UTC] column named 'time'")
+    df.index.name = "_time"
+
+    #print(f"Writing to InfluxDB bucket '{in_bucket}-{measurement}'")
+    write_api.write(
+        bucket="Hurst",
+        org=INFLUX_ORG,
+        record=df,
+        data_frame_measurement_name=df.interval.iloc[0],
+        data_frame_tag_columns=["asset", "currency","interval"],
+    )
+    print(f"Wrote {len(df)} rows to InfluxDB bucket 'Hurst---->{df.interval.iloc[0]}'")
 
 
 
@@ -162,7 +188,7 @@ def get_last_timestamp(measurement: str, asset: str, currency: str) -> datetime:
               |> range(start: 0)
               |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
               |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-              |> keep(columns: ["_time","_measurement","asset","currency","interval","price","volume"])
+              |> keep(columns: ["_time","_measurement","asset","currency","price","volume"])
             '''
             df = query_api.query_data_frame(flux)
 
@@ -221,7 +247,7 @@ def get_last_timestamp(measurement: str, asset: str, currency: str) -> datetime:
                   |> range(start: {start.isoformat()}, stop: {end.isoformat()})
                   |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
                   |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                  |> keep(columns: ["_time","asset","currency","interval","price","volume"])
+                  |> keep(columns: ["_time","asset","currency","price","volume"])
                 '''
                 df = query_api.query_data_frame(flux)
 
@@ -286,7 +312,7 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET, year="all"):
                             |> range(start: {start.isoformat()}, stop: {end.isoformat()})
                             |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
                             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                            |> keep(columns: ["_time","asset","currency","interval","high","delta","delta_log","return","return_log","volume"])
+                            |> keep(columns: ["_time","asset","currency","high","delta","delta_log","return","return_log","volume","interval"])
                             '''
                             df = query_api.query_data_frame(flux)
                             if not df.empty:
@@ -314,7 +340,7 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET, year="all"):
                         |> range(start: {start.isoformat()}, stop: {end.isoformat()})
                         |> filter(fn: (r) => r["asset"] == "{asset}" and r["interval"] == "{interval}")
                         |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-                        |> keep(columns: ["_time","asset","currency","interval","high","delta","delta_log","return","return_log","volume"])
+                        |> keep(columns: ["_time","asset","currency","high","delta","delta_log","return","return_log","volume","interval"])
                             '''
                         df = query_api.query_data_frame(flux)
                         if not df.empty:
@@ -370,22 +396,25 @@ def backup_csv(output_dir=BACKUP_DIR, bucket=INFLUX_BUCKET, year="all"):
 
     return saved_files
 
-def backup_hurst(bucket=INFLUX_BUCKET,output_dir=BACKUP_DIR):
+def backup_hurst(output_dir=BACKUP_DIR):
 
     client = get_client()
     query_api = client.query_api()
 
+
     flux = f'''
-    from(bucket: "{bucket}")
-    |> range(start:0)
-    |> filter(fn: (r) => r["_measurement"] == "Hurst")
+    from(bucket: "Hurst")
+    |> range(start: 0)
+    |> filter(fn: (r) => r.asset == "BTC")
+    |> filter(fn: (r) => r.interval == "Minute" or r.interval == "Day")
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     '''
     
     df = query_api.query_data_frame(flux)
+    print("hurst df:",df.head())
     if not df.empty:
         df["_time"] = pd.to_datetime(df["_time"])
-        filename = f"{bucket}_hurst.csv"
+        filename = f"Hurst.csv"
         filepath = os.path.join(output_dir, filename)
         df.to_csv(filepath, index=False)
         print(f"Saved {filepath} ({len(df)} rows)")
@@ -432,4 +461,4 @@ def write_from_backup(directory = BACKUP_DIR, year="all"):
         
         #print(f,", measurement:",DF.interval.iloc[0])
     
-        write_dataframe(DF, measurement=DF.interval.iloc[0])
+        write_dataframe(DF)
