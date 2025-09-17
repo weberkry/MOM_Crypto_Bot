@@ -407,6 +407,7 @@ def backup_hurst(output_dir=BACKUP_DIR):
     |> range(start: 0)
     |> filter(fn: (r) => r.asset == "BTC")
     |> filter(fn: (r) => r.interval == "Minute" or r.interval == "Day")
+    |> drop(columns: ["_measurement"])
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     '''
     
@@ -414,7 +415,7 @@ def backup_hurst(output_dir=BACKUP_DIR):
     print("hurst df:",df.head())
     if not df.empty:
         df["_time"] = pd.to_datetime(df["_time"])
-        filename = f"Hurst.csv"
+        filename = "Hurst.csv"
         filepath = os.path.join(output_dir, filename)
         df.to_csv(filepath, index=False)
         print(f"Saved {filepath} ({len(df)} rows)")
