@@ -420,45 +420,60 @@ def backup_hurst(output_dir=BACKUP_DIR):
         print(f"Saved {filepath} ({len(df)} rows)")
                                 
 
-
-def write_from_backup(directory = BACKUP_DIR, year="all"):
+def write_from_backup(directory = BACKUP_DIR, year="all", bucket = "CryptoPrices"):
     all_entries = os.listdir(directory)
+    print(directory)
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
-    
-    #prices data files
-    files = [f for f in files if "hurst" not in f]
+    if bucket == "CryptoPrices":
+        #prices data files
+        files = [f for f in files if "Hurst" not in f]
 
-    #hurst
-    hurst_files = [f for f in files if "hurst" in f]
-
-    if year == "all":
-            files = files
-    else:
-        files = [f for f in files if year in f]
-        #print(files)
+        if year == "all":
+                files = files
+        else:
+            files = [f for f in files if year in f]
+            #print(files)
     
-    for f in files:
-        #print(year in f)
+        for f in files:
+            #print(year in f)
         
-        print(f)
+            print(f)
         
-        DF = pd.read_csv(directory+"/"+f)
+            DF = pd.read_csv(directory+"/"+f)
+            DF = DF.set_index("_time")
+            DF.index = pd.to_datetime(DF.index, utc=True)
+            #print(DF.columns)
+            for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
+                if col in DF.columns:
+                    DF[col] = pd.to_numeric(DF[col], errors="coerce")
+                else:
+                    DF[col] = 0.0
+            # Ensure tag columns are strings
+            for col in ["asset", "currency", "interval"]:
+                if col in DF.columns:
+                    DF[col] = DF[col].astype(str)
+
+            DF = Mandelbrot.fill_nas(DF)
+
+            
+            #print(f,", measurement:",DF.interval.iloc[0])
+        
+            write_dataframe(DF)
+    
+    elif bucket == "Hurst":
+        #hurst
+        hurst_file = [f for f in files if "Hurst" in f]
+        DF = pd.read_csv(directory+"/"+ hurst_file[0])
         DF = DF.set_index("_time")
         DF.index = pd.to_datetime(DF.index, utc=True)
-        #print(DF.columns)
-        for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
-            if col in DF.columns:
-                DF[col] = pd.to_numeric(DF[col], errors="coerce")
-            else:
-                DF[col] = 0.0
-        # Ensure tag columns are strings
+        DF["hurst"] = pd.to_numeric(DF["hurst"], errors="coerce")
         for col in ["asset", "currency", "interval"]:
-            if col in DF.columns:
-                DF[col] = DF[col].astype(str)
-
-        DF = Mandelbrot.fill_nas(DF)
+                if col in DF.columns:
+                    DF[col] = DF[col].astype(str)
         
-        #print(f,", measurement:",DF.interval.iloc[0])
+        write_hurst(DF)
+
+    else:
+        print("Select valid file")
     
-        write_dataframe(DF)
