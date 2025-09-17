@@ -407,7 +407,7 @@ def backup_hurst(output_dir=BACKUP_DIR):
     |> range(start: 0)
     |> filter(fn: (r) => r.asset == "BTC")
     |> filter(fn: (r) => r.interval == "Minute" or r.interval == "Day")
-    |> drop(columns: ["_measurement"])
+    |> drop(columns: ["_measurement","_start","_stop])
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     '''
     
