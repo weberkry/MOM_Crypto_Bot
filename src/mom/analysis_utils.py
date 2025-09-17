@@ -47,20 +47,25 @@ def get_hurst(asset=ASSET, currency=CURRENCY):
     
     return df
 
-def get_hurst_historic(asset=ASSET,currency = CURRENCY, end= influx.get_last_timestamp("Day", ASSET, CURRENCY).date().isoformat()):
+def get_hurst_historic(asset=ASSET,currency = CURRENCY, end= influx.get_last_timestamp(measurement="Day", asset=ASSET, currency=CURRENCY).date().isoformat()):
     
-    print("reading Influx data")
+    start = influx.get_last_timestamp(measurement="Day", bucket = "Hurst", asset=ASSET, currency=CURRENCY, field="hurst").date().isoformat()
+    
+    dates = pd.date_range(start=start,    #divide dates for MIN and DAY (DAY data starts at 2015)
+                          end=end, 
+                          freq="D")
+    print("----calculating for dates:")
+    print("from:",start," to:", end)
+    #print(dates[-1],dates[0])
+    
+    
+    print("----reading Influx data")
     MIN = influx.query_returns(asset=asset, interval="Minute", start=0, field="delta")
     #print("min complete")
     #HOUR = influx.query_returns(asset=a, interval="Hour", start=0, field="delta")
     DAY = influx.query_returns(asset=asset, interval="Day", start=0, field="delta")
+
     
-    dates = pd.date_range(start="2020-01-01",    #divide dates for MIN and DAY (DAY data starts at 2015)
-                          end=end, 
-                          freq="D")
-    
-    #print(start, end)
-    #print(dates)
     
     #
     #maybe adjust for minute in min_before

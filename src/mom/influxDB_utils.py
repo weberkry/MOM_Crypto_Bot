@@ -127,18 +127,18 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns"):
     return df
 
 
-def get_last_timestamp(measurement: str, asset: str, currency: str) -> datetime:
+def get_last_timestamp(bucket = INFLUX_BUCKET,measurement= "Day", asset= "BTC", currency= "EUR", field="high") -> datetime:
     """
     Query InfluxDB to get the most recent timestamp for a measurement/asset/currency.
     """
     Q = get_query_api(get_client())
     flux = f"""
-    from(bucket: "{INFLUX_BUCKET}")
+    from(bucket: "{bucket}")
       |> range(start: 0)
       |> filter(fn: (r) => r._measurement == "{measurement}")
       |> filter(fn: (r) => r.asset == "{asset}")
       |> filter(fn: (r) => r.currency == "{currency}")
-      |> filter(fn: (r) => r._field == "high")
+      |> filter(fn: (r) => r._field == "{field}")
       |> last()
     """
     tables = Q.query(org=INFLUX_ORG, query=flux)
