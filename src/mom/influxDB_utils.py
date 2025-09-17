@@ -464,6 +464,7 @@ def write_from_backup(directory = BACKUP_DIR, year="all", bucket = "CryptoPrices
     elif bucket == "Hurst":
         #hurst
         hurst_file = [f for f in files if "Hurst" in f]
+        print(hurst_file)
         DF = pd.read_csv(directory+"/"+ hurst_file[0])
         DF = DF.set_index("_time")
         DF.index = pd.to_datetime(DF.index, utc=True)
