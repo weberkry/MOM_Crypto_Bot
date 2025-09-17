@@ -407,8 +407,8 @@ def backup_hurst(output_dir=BACKUP_DIR):
     |> range(start: 0)
     |> filter(fn: (r) => r.asset == "BTC")
     |> filter(fn: (r) => r.interval == "Minute" or r.interval == "Day")
-    |> drop(columns: ["_measurement","_start","_stop])
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+    |> keep(columns: ["_time","asset","currency","interval","hurst"])
     '''
     
     df = query_api.query_data_frame(flux)
@@ -474,7 +474,11 @@ def write_from_backup(directory = BACKUP_DIR, year="all", bucket = "CryptoPrices
                 if col in DF.columns:
                     DF[col] = DF[col].astype(str)
         
-        write_hurst(DF)
+        DAY = DF[DF["interval"]=="Day"]
+        MIN = DF[DF["interval"]=="Minute"]
+
+        write_hurst(DAY)
+        write_hurst(MIN)
 
     else:
         print("Select valid file")
