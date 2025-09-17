@@ -152,8 +152,8 @@ def update(max_retries: int = 3):
 def update():
     MIN, DAY = Mandelbrot.update_datasets(crypto=ASSET,curr = CURRENCY)
     print(MIN.head())
-    influx.write_dataframe(MIN, measurement="Minute")
-    influx.write_dataframe(DAY, measurement="Day")
+    influx.write_dataframe(MIN)
+    influx.write_dataframe(DAY)
 
 
 if __name__ == "__main__":

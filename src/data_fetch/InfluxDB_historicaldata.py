@@ -13,7 +13,7 @@ for c in ["BTC"]:
 
         for start in range(0, total_rows, chunk_size):
             chunk = INTERVAL.iloc[start:start + chunk_size]
-            influx.write_dataframe(chunk, measurement=INTERVAL.interval.iloc[0])
+            influx.write_dataframe(chunk)
             print(f"Wrote rows {start}-{start+len(chunk)-1} ")
 	
 	
