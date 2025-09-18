@@ -21,7 +21,7 @@ BACKUP_DIR = os.getenv("BACKUP_DIR")
 def get_client():
     if not all([INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET]):
         raise ValueError("Missing InfluxDB env vars. Check your .env file.")
-    return InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+    return InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG, timeout=60_000)  # milliseconds
 
 
 def get_write_api(client):
