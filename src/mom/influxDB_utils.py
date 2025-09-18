@@ -25,7 +25,7 @@ def get_client():
 
 
 def get_write_api(client):
-    return client.write_api(write_options=ASYNCHRONOUS)
+    return client.write_api(write_options=SYNCHRONOUS)
 
 def get_query_api(client):
     return client.query_api()
