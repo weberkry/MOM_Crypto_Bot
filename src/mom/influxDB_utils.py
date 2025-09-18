@@ -103,7 +103,7 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns"):
       |> filter(fn: (r) => r["_measurement"] == "{interval}")
       |> filter(fn: (r) => r["asset"] == "{asset}")
       |> filter(fn: (r) => r["_field"] == "{field}")
-      |> keep(columns: ["_time", "_value", "asset", "currency", "interval"])
+      |> keep(columns: ["_time", "_value"])
     '''
 
     tables = Q.query(org=INFLUX_ORG, query=flux)
@@ -115,14 +115,14 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns"):
             records.append({
                 "time": record["_time"],
                 field: record["_value"],
-                "asset": record["asset"],
-                "currency": record["currency"],
-                "interval": record["interval"],
             })
 
     df = pd.DataFrame(records)
     if not df.empty:
         df.set_index("time", inplace=True)
+        df["asset"] = asset
+        df["interval"] = interval
+        df["currency"] = "EUR"
 
     return df
 
