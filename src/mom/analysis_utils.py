@@ -60,10 +60,12 @@ def get_hurst_historic(asset=ASSET,currency = CURRENCY, end= influx.get_last_tim
     
     
     print("----reading Influx data")
-    MIN = influx.query_returns(asset=asset, interval="Minute", start=0, field="delta")
-    #print("min complete")
-    #HOUR = influx.query_returns(asset=a, interval="Hour", start=0, field="delta")
     DAY = influx.query_returns(asset=asset, interval="Day", start=0, field="delta")
+    print("----Day data complete")
+    MIN = influx.query_returns(asset=asset, interval="Minute", start=0, field="delta")
+    print("----Minute data complete")
+    #HOUR = influx.query_returns(asset=a, interval="Hour", start=0, field="delta")
+    #DAY = influx.query_returns(asset=asset, interval="Day", start=0, field="delta")
 
     
     
