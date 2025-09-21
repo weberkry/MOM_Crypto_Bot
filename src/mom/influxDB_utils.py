@@ -21,7 +21,7 @@ BACKUP_DIR = os.getenv("BACKUP_DIR")
 def get_client():
     if not all([INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET]):
         raise ValueError("Missing InfluxDB env vars. Check your .env file.")
-    return InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+    return InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG, timeout=240_000)  # milliseconds
 
 
 def get_write_api(client):
@@ -103,7 +103,7 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns", buc
       |> filter(fn: (r) => r["_measurement"] == "{interval}")
       |> filter(fn: (r) => r["asset"] == "{asset}")
       |> filter(fn: (r) => r["_field"] == "{field}")
-      |> keep(columns: ["_time", "_value", "asset", "currency", "interval"])
+      |> keep(columns: ["_time", "_value"])
     '''
 
     tables = Q.query(org=INFLUX_ORG, query=flux)
@@ -115,14 +115,14 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns", buc
             records.append({
                 "time": record["_time"],
                 field: record["_value"],
-                "asset": record["asset"],
-                "currency": record["currency"],
-                "interval": record["interval"],
             })
 
     df = pd.DataFrame(records)
     if not df.empty:
         df.set_index("time", inplace=True)
+        df["asset"] = asset
+        df["interval"] = interval
+        df["currency"] = "EUR"
 
     return df
 
@@ -408,57 +408,78 @@ def backup_hurst(output_dir=BACKUP_DIR):
     |> filter(fn: (r) => r.asset == "BTC")
     |> filter(fn: (r) => r.interval == "Minute" or r.interval == "Day")
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+    |> keep(columns: ["_time","asset","currency","interval","hurst"])
     '''
     
     df = query_api.query_data_frame(flux)
     print("hurst df:",df.head())
     if not df.empty:
         df["_time"] = pd.to_datetime(df["_time"])
-        filename = f"Hurst.csv"
+        filename = "Hurst.csv"
         filepath = os.path.join(output_dir, filename)
         df.to_csv(filepath, index=False)
         print(f"Saved {filepath} ({len(df)} rows)")
                                 
 
-
-def write_from_backup(directory = BACKUP_DIR, year="all"):
+def write_from_backup(directory = BACKUP_DIR, year="all", bucket = "CryptoPrices"):
     all_entries = os.listdir(directory)
+    print(directory)
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
-    
-    #prices data files
-    files = [f for f in files if "hurst" not in f]
+    if bucket == "CryptoPrices":
+        #prices data files
+        files = [f for f in files if "Hurst" not in f]
 
-    #hurst
-    hurst_files = [f for f in files if "hurst" in f]
-
-    if year == "all":
-            files = files
-    else:
-        files = [f for f in files if year in f]
-        #print(files)
+        if year == "all":
+                files = files
+        else:
+            files = [f for f in files if year in f]
+            #print(files)
     
-    for f in files:
-        #print(year in f)
+        for f in files:
+            #print(year in f)
         
-        print(f)
+            print(f)
         
-        DF = pd.read_csv(directory+"/"+f)
+            DF = pd.read_csv(directory+"/"+f)
+            DF = DF.set_index("_time")
+            DF.index = pd.to_datetime(DF.index, utc=True)
+            #print(DF.columns)
+            for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
+                if col in DF.columns:
+                    DF[col] = pd.to_numeric(DF[col], errors="coerce")
+                else:
+                    DF[col] = 0.0
+            # Ensure tag columns are strings
+            for col in ["asset", "currency", "interval"]:
+                if col in DF.columns:
+                    DF[col] = DF[col].astype(str)
+
+            DF = Mandelbrot.fill_nas(DF)
+
+            
+            #print(f,", measurement:",DF.interval.iloc[0])
+        
+            write_dataframe(DF)
+    
+    elif bucket == "Hurst":
+        #hurst
+        hurst_file = [f for f in files if "Hurst" in f]
+        print(hurst_file)
+        DF = pd.read_csv(directory+"/"+ hurst_file[0])
         DF = DF.set_index("_time")
         DF.index = pd.to_datetime(DF.index, utc=True)
-        #print(DF.columns)
-        for col in ["high","low","volume", "delta", "delta_log", "return", "return_log"]:
-            if col in DF.columns:
-                DF[col] = pd.to_numeric(DF[col], errors="coerce")
-            else:
-                DF[col] = 0.0
-        # Ensure tag columns are strings
+        DF["hurst"] = pd.to_numeric(DF["hurst"], errors="coerce")
         for col in ["asset", "currency", "interval"]:
-            if col in DF.columns:
-                DF[col] = DF[col].astype(str)
-
-        DF = Mandelbrot.fill_nas(DF)
+                if col in DF.columns:
+                    DF[col] = DF[col].astype(str)
         
-        #print(f,", measurement:",DF.interval.iloc[0])
+        DAY = DF[DF["interval"]=="Day"]
+        MIN = DF[DF["interval"]=="Minute"]
+
+        write_hurst(DAY)
+        write_hurst(MIN)
+
+    else:
+        print("Select valid file")
     
-        write_dataframe(DF)

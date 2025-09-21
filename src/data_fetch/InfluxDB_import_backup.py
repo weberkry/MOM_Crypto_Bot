@@ -9,3 +9,4 @@ print("using ", y)
 
 if __name__ == "__main__":
     influx.write_from_backup(year = y)
+    influx.write_from_backup(bucket="Hurst")
