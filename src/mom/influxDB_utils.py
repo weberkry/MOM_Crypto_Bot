@@ -84,7 +84,7 @@ def write_hurst(df):
 
 
 
-def query_returns(asset="BTC", interval="Day", start="-30d",field="returns"):
+def query_returns(asset="BTC", interval="Day", start="-30d",field="returns", bucket=INFLUX_BUCKET):
     """
     Query 'return' field for a specific asset & interval from InfluxDB.
     
@@ -98,7 +98,7 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns"):
     Q = get_query_api(get_client())
 
     flux = f'''
-    from(bucket: "{INFLUX_BUCKET}")
+    from(bucket: "{bucket}")
       |> range(start: {start})
       |> filter(fn: (r) => r["_measurement"] == "{interval}")
       |> filter(fn: (r) => r["asset"] == "{asset}")

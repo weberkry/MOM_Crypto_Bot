@@ -23,13 +23,28 @@ import hnswlib
 from newsapi import NewsApiClient
 import praw
 
+import sys, os
+# Load env from project root
+load_dotenv()
 
-def init_index(max_elements=20000):
-    global _index_initialized
-    if not _index_initialized:
-        _index.init_index(max_elements=max_elements, ef_construction=200, M=16)
-        _index.set_ef(50)
-        _index_initialized = True
+#the following entries are expected in the MOM_Crypto_Bot/.env
+ASSET = os.getenv("ASSET")
+CURRENCY = os.getenv("CURRENCY")
+
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+#OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL = "gpt-4o-mini"
+#OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
+OPENAI_TEMPERATURE = float("0.0")
+
+NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
+#REDDIT_ID = os.getenv("REDDIT_CLIENT_ID")
+#REDDIT_SECRET = os.getenv("REDDIT_SECRET")
+TELEGRAM_API = os.getenv("TELEGRAM_API")
+
+OpenAI.api_key = OPENAI_KEY
+newsapi = NewsApiClient(api_key=NEWSAPI_KEY)
+
 
 
 def fetch_newsapi_articles(
@@ -37,7 +52,7 @@ def fetch_newsapi_articles(
     range_days: Optional[str] = None,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-    page_size: int = 50
+    page_size: int = 30
 ) -> List[Dict]:
     """
     Fetch articles from NewsAPI.
@@ -46,7 +61,7 @@ def fetch_newsapi_articles(
     ----------
     query : str
         Keyword(s) to search for (e.g. "BTC").
-    range_days : str, optional
+    range : str, optional
         Relative range, e.g. '7d' for 7 days, '24h' for 24 hours.
     from_date : str, optional
         Absolute start date, format 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS'.
@@ -62,7 +77,7 @@ def fetch_newsapi_articles(
         "sort_by": "publishedAt"
     }
 
-    # --- relative range (d,h)
+    # --- relative range ---
     if range_days and not from_date:
         unit = range_days[-1]
         value = int(range_days[:-1])
@@ -77,13 +92,13 @@ def fetch_newsapi_articles(
 
         params["from_param"] = from_dt.strftime("%Y-%m-%dT%H:%M:%S")
 
-    # --- absolute range
+    # --- absolute range ---
     if from_date:
         params["from_param"] = from_date
     if to_date:
         params["to"] = to_date
 
-    # --- call NewsAPI
+    # --- call NewsAPI ---
     res = newsapi.get_everything(**params)
     articles = res.get("articles", [])
 
@@ -99,6 +114,7 @@ def fetch_newsapi_articles(
         })
     return cleaned
 
+
 # --- chunk text for adding vecotrized articles to index
 def chunk_text(txt: str, max_words=200):
     
@@ -110,36 +126,8 @@ def chunk_text(txt: str, max_words=200):
     
     return chunks
 
-# --- adding newsapi articles
-def add_articles_to_index(articles: List[Dict], prefix_id=0):
-    
-    init_index(max_elements=max(10000, len(articles)*4))
-    
-    current_max_id = max(_articles_store.keys())+1 if _articles_store else 0
-    idx = current_max_id
-    texts = []
-    metas = []
-    
-    for art in articles:
-        full_text = " ".join([art["title"], art["description"], art["content"]])
-        chunks = chunk_text(full_text, max_words=200)
-        for chunk in chunks:
-            texts.append(chunk)
-            metas.append({
-                "title": art["title"],
-                "url": art["url"],
-                "source": art["source"],
-                "publishedAt": art["publishedAt"]
-            })
-    
-    if not texts:
-        return {}
-    
-    embeddings = embed_model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
-    ids = list(range(idx, idx + len(texts)))
-    index.add_items(embeddings, ids)
-    
-    for i, m in zip(ids, metas):
-        _articles_store[i] = {"text": texts[i-idx], "meta": m}
-    
-    return {i: _articles_store[i] for i in ids}
+# ---- safe chunking ----
+def chunk_text(txt: str, max_words=200):
+    words = txt.split()
+    return [" ".join(words[i:i+max_words]) for i in range(0, len(words), max_words)]
+

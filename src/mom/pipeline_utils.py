@@ -190,19 +190,45 @@ def retrieve(query: str, k=5):
         if lid in _articles_store:
             results.append({**_articles_store[lid]["meta"], "text": _articles_store[lid]["text"], "id": lid})
     return results
+
+
+
 # ---- LLM prompt + call
-def build_prompt(asset: str, hurst_value: float, hurst_cat: str, retrieved: List[Dict]):
-    header = f"Asset: {asset}\nHurst: {hurst_value}\nHurst_category: {hurst_cat}\n\n"
-    header += "You are a financial risk analyst. Using the Hurst signal (above) and the news snippets below, produce a concise risk evaluation (1-3 short paragraphs) with:\n"
-    header += "- a single-line risk level (LOW / MEDIUM / HIGH)\n- a short justification referencing the Hurst signal and at least two article snippets by source+date.\n- suggestions for monitoring (what to watch next).\n\n"
+def build_prompt(asset: str, 
+                 hurst_minute: float, hurst_minute_cat: str, 
+                 hurst_daily: float, hurst_daily_cat: str, 
+                 retrieved: List[Dict]) -> str:
+    # --- Header with hurst values ---
+    header = (
+        f"Asset: {asset}\n"
+        f"Hurst (Minute): {hurst_minute} ({hurst_minute_cat})\n"
+        f"Hurst (Daily): {hurst_daily} ({hurst_daily_cat})\n\n"
+    )
+    
+    # --- Instruction ---
+    header += (
+        "You are a financial risk analyst. Using the Hurst signals (above) for "
+        "both the Minute and Daily intervals, together with the news snippets below, "
+        "produce a concise risk evaluation (1–3 short paragraphs) that includes:\n"
+        "- a single-line risk level (LOW / MEDIUM / HIGH)\n"
+        "- a short justification referencing both Hurst signals and at least two article snippets (cite source + date)\n"
+        "- suggestions for monitoring (what to watch next)\n\n"
+    )
+    
+    # --- Add snippets ---
     prompt = header + "News snippets (most relevant first):\n"
     for r in retrieved:
         pub = r.get("publishedAt")
         src = r.get("source")
-        title = r.get("title", "") if "title" in r else ""
-        snippet = r.get("text")[:800]
+        title = r.get("title", "")
+        snippet = r.get("text", "")[:800]
         prompt += f"\n[{src} | {pub}] {title}\n{snippet}\n---\n"
-    prompt += "\nNow give the risk evaluation. Be concise and include explicit references to the Hurst signal and news snippets.\n"
+    
+    # --- Final instruction ---
+    prompt += (
+        "\nNow provide the risk evaluation. "
+        "Be concise and make explicit references to both the Hurst signals and the news snippets.\n"
+    )
     return prompt
 
 def ask_llm(prompt: str, model: str = OPENAI_MODEL, temperature=OPENAI_TEMPERATURE, max_tokens=600):
@@ -220,13 +246,16 @@ def ask_llm(prompt: str, model: str = OPENAI_MODEL, temperature=OPENAI_TEMPERATU
     return resp.choices[0].message.content
 
 def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
+    """Run end-to-end RAG pipeline for risk analysis on a given asset."""
 
     # 1) Hurst
     #h = get_latest_hurst(asset)
-    h = 0.56
-    hcat = categorize_hurst(h)
-
-    print("Hurst:",h," ",hcat)
+    H_Day = influx.query_returns(asset="BTC", interval="Day", start="-30d",field="hurst", bucket="Hurst")
+    H_Minute = influx.query_returns(asset="BTC", interval="Minute", start="-30d",field="hurst", bucket="Hurst")
+    h_cat_day = categorize_hurst(H_Day.hurst.iloc[-1])
+    h_cat_min = categorize_hurst(H_Minute.hurst.iloc[-1])
+    print("Hurst (Day):",H_Day.hurst.iloc[0]," ",h_cat_day)
+    print("Hurst (Min):",H_Minute.hurst.iloc[0]," ",h_cat_min)
 
     # 2) Fetch news (relative lookback)
     since = datetime.now(timezone.utc) - timedelta(days=lookback_news_days)
@@ -237,8 +266,10 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
         return {
             "asset": asset,
             "error": "No articles found",
-            "hurst_value": h,
-            "hurst_cat": hcat,
+            "hurst_value_daily": H_Day,
+            "hurst_cat_daily": h_cat_day,
+            "hurst_value_minute": H_Minute,
+            "hurst_cat_minute": h_cat_min,
             "retrieved": [],
             "llm_result": None,
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -251,8 +282,10 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
         return {
             "asset": asset,
             "error": "No chunks indexed",
-            "hurst_value": h,
-            "hurst_cat": hcat,
+            "hurst_value_daily": H_Day,
+            "hurst_cat_daily": h_cat_day,
+            "hurst_value_minute": H_Minute,
+            "hurst_cat_minute": h_cat_min,
             "retrieved": [],
             "llm_result": None,
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -265,22 +298,27 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
         return {
             "asset": asset,
             "error": "No retrieval results",
-            "hurst_value": h,
-            "hurst_cat": hcat,
+            "hurst_value_daily": H_Day,
+            "hurst_cat_daily": h_cat_day,
+            "hurst_value_minute": H_Minute,
+            "hurst_cat_minute": h_cat_min,
             "retrieved": [],
             "llm_result": None,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     # 5) Build prompt and query LLM
-    prompt = build_prompt(asset, h, hcat, retrieved)
+    prompt = build_prompt(asset, H_Minute, h_cat_min,H_Day, h_cat_day, retrieved)
+    
     #print(prompt)
     llm_result = ask_llm(prompt)
 
     return {
         "asset": asset,
-        "hurst_value": h,
-        "hurst_cat": hcat,
+        "hurst_value_daily": H_Day,
+        "hurst_cat_daily": h_cat_day,
+        "hurst_value_minute": H_Minute,
+        "hurst_cat_minute": h_cat_min,
         "retrieved": retrieved,
         "llm_result": llm_result,
         "timestamp": datetime.now(timezone.utc).isoformat()
