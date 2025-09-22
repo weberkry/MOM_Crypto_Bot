@@ -356,7 +356,7 @@ def calculate_pdf(data, PDF):
     
     return params, pdf_fitted, x
 
-def calculate_pdf_fit(data, params):
+def calculate_pdf_fit(data, params, pdf):
     from scipy.stats import norm, cauchy, lognorm, expon, kstest
     arg = params[:-2]
     loc = params[-2]
@@ -368,7 +368,7 @@ def calculate_pdf_fit(data, params):
     
     
     #Cramér von mises Test
-    cvm = scipy.stats.cramervonmises(data, 'norm')
+    cvm = scipy.stats.cramervonmises(data, pdf)
     fit_test.append(cvm)
 
     return fit_test

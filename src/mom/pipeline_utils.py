@@ -12,7 +12,7 @@ from typing import List, Dict, Optional
 # own functions
 from mom import influxDB_utils as influx
 from mom import Mandelbrot
-from mom import news_utils as news
+from mom import analysis_utils as analysis
 
 
 from openai import OpenAI
@@ -197,20 +197,32 @@ def retrieve(query: str, k=5):
 def build_prompt(asset: str, 
                  hurst_minute: float, hurst_minute_cat: str, 
                  hurst_daily: float, hurst_daily_cat: str, 
+                 cvm_norm_Day: float,
+                 cvm_norm_Minute: float, 
+                 cvm_cauchy_Day: float, 
+                 cvm_cauchy_Minute: float,  
                  retrieved: List[Dict]) -> str:
-    # --- Header with hurst values ---
+    # --- Header with hurst values and PDF Fit---
     header = (
         f"Asset: {asset}\n"
         f"Hurst (Minute): {hurst_minute} ({hurst_minute_cat})\n"
-        f"Hurst (Daily): {hurst_daily} ({hurst_daily_cat})\n\n"
+        f"Hurst (Daily): {hurst_daily} ({hurst_daily_cat})\n"
+        f"Cramer von Mises (Norm Fit Minute): {cvm_norm_Minute}\n"
+        f"Cramer von Mises (Norm Fit Day): {cvm_norm_Day}\n"
+        f"Cramer von Mises (Cauchy Fit Minute): {cvm_cauchy_Minute}\n"
+        f"Cramer von Mises (Cauchy Fit Day): {cvm_cauchy_Day}\n\n"
     )
     
     # --- Instruction ---
     header += (
-        "You are a financial risk analyst. Using the Hurst signals (above) for "
-        "both the Minute and Daily intervals, together with the news snippets below, "
+        "You are a financial risk analyst, statsistic expert and familiar with Misbehavior of Markets (Benoit Mandelbrot)" 
+        "Using the Hurst signals (above)"
+        "and normal distribution vs cauchy distribution of the deltas between datapoints"
+        "fitted with cramer von mises evaluation (above)"
+        "for both the Minute and Daily intervals, together with the news snippets below, "
         "produce a concise risk evaluation (1–3 short paragraphs) that includes:\n"
         "- a single-line risk level (LOW / MEDIUM / HIGH)\n"
+        "- a short explaination which distribution fits best and what that means for the data"
         "- a short justification referencing both Hurst signals and at least two article snippets (cite source + date)\n"
         "- suggestions for monitoring (what to watch next)\n\n"
     )
@@ -250,12 +262,22 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
 
     # 1) Hurst
     #h = get_latest_hurst(asset)
-    H_Day = influx.query_returns(asset="BTC", interval="Day", start="-30d",field="hurst", bucket="Hurst")
+    H_Day= influx.query_returns(asset="BTC", interval="Day", start="-30d",field="hurst", bucket="Hurst")
+    H_Day = H_Day.hurst.iloc[-1]
     H_Minute = influx.query_returns(asset="BTC", interval="Minute", start="-30d",field="hurst", bucket="Hurst")
-    h_cat_day = categorize_hurst(H_Day.hurst.iloc[-1])
-    h_cat_min = categorize_hurst(H_Minute.hurst.iloc[-1])
-    print("Hurst (Day):",H_Day.hurst.iloc[0]," ",h_cat_day)
-    print("Hurst (Min):",H_Minute.hurst.iloc[0]," ",h_cat_min)
+    H_Minute = H_Minute.hurst.iloc[-1]
+    h_cat_day = categorize_hurst(H_Day)
+    h_cat_min = categorize_hurst(H_Minute)
+    print("Hurst (Day):",H_Day," ",h_cat_day)
+    print("Hurst (Min):",H_Minute," ",h_cat_min)
+
+    # 2) Get PDF FIT
+    DF_Day = influx.query_returns(asset=ASSET, interval="Day", start="0", field="delta")
+    DF_Min = influx.query_returns(asset=ASSET, interval="Minute", start="0", field="delta")
+    DF_Min = DF_Min.sample(n=50000, random_state=42) # Full DF is too big
+    
+    cvm_Min = analysis.pdf_fit_return(DF_Min)
+    cvm_Day = analysis.pdf_fit_return(DF_Day)
 
     # 2) Fetch news (relative lookback)
     since = datetime.now(timezone.utc) - timedelta(days=lookback_news_days)
@@ -270,6 +292,10 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
             "hurst_cat_daily": h_cat_day,
             "hurst_value_minute": H_Minute,
             "hurst_cat_minute": h_cat_min,
+            "cvm_norm_Day": cvm_Day[0],
+            "cvm_norm_Minute": cvm_Min[0], 
+            "cvm_cauchy_Day": cvm_Day[1], 
+            "cvm_cauchy_Minute": cvm_Min[1],
             "retrieved": [],
             "llm_result": None,
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -286,6 +312,10 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
             "hurst_cat_daily": h_cat_day,
             "hurst_value_minute": H_Minute,
             "hurst_cat_minute": h_cat_min,
+            "cvm_norm_Day": cvm_Day[0],
+            "cvm_norm_Minute": cvm_Min[0], 
+            "cvm_cauchy_Day": cvm_Day[1], 
+            "cvm_cauchy_Minute": cvm_Min[1],  
             "retrieved": [],
             "llm_result": None,
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -302,13 +332,17 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
             "hurst_cat_daily": h_cat_day,
             "hurst_value_minute": H_Minute,
             "hurst_cat_minute": h_cat_min,
+            "cvm_norm_Day": cvm_Day[0],
+            "cvm_norm_Minute": cvm_Min[0], 
+            "cvm_cauchy_Day": cvm_Day[1], 
+            "cvm_cauchy_Minute": cvm_Min[1],
             "retrieved": [],
             "llm_result": None,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     # 5) Build prompt and query LLM
-    prompt = build_prompt(asset, H_Minute, h_cat_min,H_Day, h_cat_day, retrieved)
+    prompt = build_prompt(asset, H_Minute, h_cat_min,H_Day, h_cat_day,cvm_Day[0],cvm_Min[0],cvm_Day[1],cvm_Min[1], retrieved)
     
     #print(prompt)
     llm_result = ask_llm(prompt)
@@ -319,6 +353,10 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
         "hurst_cat_daily": h_cat_day,
         "hurst_value_minute": H_Minute,
         "hurst_cat_minute": h_cat_min,
+        "cvm_norm_Day": cvm_Day[0],
+        "cvm_norm_Minute": cvm_Min[0], 
+        "cvm_cauchy_Day": cvm_Day[1], 
+        "cvm_cauchy_Minute": cvm_Min[1],
         "retrieved": retrieved,
         "llm_result": llm_result,
         "timestamp": datetime.now(timezone.utc).isoformat()

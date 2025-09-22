@@ -110,4 +110,15 @@ def get_hurst_historic(asset=ASSET,currency = CURRENCY, end= influx.get_last_tim
         influx.write_hurst(MIN_hurst)
         influx.write_hurst(DAY_hurst)
     
+
+
+def pdf_fit_return(DF):
+    gauss_params, gauss_pdf_fitted, gauss_x = Mandelbrot.gauss_pdf(DF["delta"])
+    cauchy_params, cauchy_pdf_fitted, cauchy_x = Mandelbrot.cauchy_pdf(DF["delta"])
+    cauchy_cvm = Mandelbrot.calculate_pdf_fit(DF["delta"],cauchy_params, "cauchy")
+    gauss_cvm = Mandelbrot.calculate_pdf_fit(DF["delta"], gauss_params, "norm")
+
+    cvm = [gauss_cvm, cauchy_cvm]
+
+    return cvm
     
