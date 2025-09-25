@@ -300,8 +300,9 @@ def gauss_pdf(data):
     #cvm = scipy.stats.cramervonmises(data, 'norm')
 
     #fit density
-    xmin, xmax = plt.xlim()
-    x = np.linspace(xmin, xmax, 100)
+    xmin = data.min()
+    xmax = data.max()
+    x = np.linspace(xmin, xmax, 500)
     pdf_fitted = dist.pdf(x, loc=sigma, scale=mu)
 
     return params, pdf_fitted, x
@@ -322,8 +323,9 @@ def cauchy_pdf(data):
     #cvm = scipy.stats.cramervonmises(data, 'cauchy')
 
     #fit density
-    xmin, xmax = plt.xlim()
-    x = np.linspace(xmin, xmax, 100)
+    xmin = data.min()
+    xmax = data.max()
+    x = np.linspace(xmin, xmax, 500)
     pdf_fitted = dist.pdf(x, loc=x0, scale=gamma)
 
     return params, pdf_fitted, x
@@ -344,10 +346,9 @@ def calculate_pdf(data, PDF):
     scale = params[-1]
     
     #fit density
-    xmin, xmax = plt.xlim()
-    x = np.linspace(xmin, xmax, 100)
-
-    
+    xmin = data.min()
+    xmax = data.max()
+    x = np.linspace(xmin, xmax, 500)
     
     if arg:
         pdf_fitted = dist.pdf(x, *arg, loc=loc, scale=scale)
