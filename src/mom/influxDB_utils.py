@@ -113,7 +113,7 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns", buc
     Q = get_query_api(get_client())
 
     if bucket == "PDF":
-        print("using this road")
+        print("Reading Bucket PDF------")
         flux = f'''
         from(bucket: "{bucket}")
         |> range(start: {start})
@@ -142,7 +142,7 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns", buc
                 records.append(row)
     
     else:
-
+        print(f"Reading Bucket {bucket}------")
         flux = f'''
         from(bucket: "{bucket}")
         |> range(start: {start})
@@ -165,7 +165,7 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns", buc
 
 
     df = pd.DataFrame(records)
-    print(df.head())
+    #print(df.head())
     if not df.empty:
         df.set_index("time", inplace=True)
         df["asset"] = asset

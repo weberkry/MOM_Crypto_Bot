@@ -262,6 +262,7 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
 
     # 1) Hurst
     #h = get_latest_hurst(asset)
+    print("Step 1 --- Hurst --- ")
     H_Day= influx.query_returns(asset="BTC", interval="Day", start="-30d",field="hurst", bucket="Hurst")
     H_Day = H_Day.hurst.iloc[-1]
     H_Minute = influx.query_returns(asset="BTC", interval="Minute", start="-30d",field="hurst", bucket="Hurst")
@@ -272,6 +273,7 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
     print("Hurst (Min):",H_Minute," ",h_cat_min)
 
     # 2) Get PDF FIT
+    print("Step 2 --- Prbability Density Function --- ")
     #DF_Day = influx.query_returns(asset=ASSET, interval="Day", start="0", field="delta")
     #DF_Min = influx.query_returns(asset=ASSET, interval="Minute", start="0", field="delta")
     #DF_Min = DF_Min.sample(n=50000, random_state=42) # Full DF is too big
@@ -279,11 +281,14 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
     #cvm_Min = analysis.pdf_fit_return(DF_Min)
     #cvm_Day = analysis.pdf_fit_return(DF_Day)
     def get_cvm_values(DF):
-        cvm_cauchy = [(DF["parameter"] == "cvm") & (DF["pdf"] == "cauchy")]
-        cvm_c = cvm_cauchy["_value"].iloc[0]
-        cvm_gauss = [(DF["parameter"] == "cvm") & (DF["pdf"] == "gauss")]
-        cvm_g = cvm_gauss["_value"].iloc[0]
-        return [cvm_gauss, cvm_cauchy]
+        #cvm_cauchy = [(DF["parameter"] == "cvm") & (DF["pdf"] == "cauchy")]
+        subset = DF[DF["parameter"].isin(["cvm"])]
+        subset_c = subset[subset["pdf"].isin(["cauchy"])]
+        subset_g = subset[subset["pdf"].isin(["gauss"])]
+        cvm_c = subset_c._value.iloc[0]
+        #cvm_gauss = [(DF["parameter"] == "cvm") & (DF["pdf"] == "gauss")]
+        cvm_g = subset_g._value.iloc[0]
+        return [cvm_g, cvm_c]
 
     pdf_Min = analysis.get_pdf(interval="Minute")
     pdf_Day = analysis.get_pdf(interval="Day")
@@ -292,6 +297,7 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
     cvm_Day = get_cvm_values(pdf_Day)
 
     # 2) Fetch news (relative lookback)
+    print("Step 3 --- Get recent news --- ")
     since = datetime.now(timezone.utc) - timedelta(days=lookback_news_days)
     from_date = since.strftime("%Y-%m-%dT%H:%M:%S")
     articles = fetch_newsapi_articles(query=asset, from_date=from_date, page_size=50)

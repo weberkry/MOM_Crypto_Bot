@@ -45,7 +45,7 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     result = pipeline.run_rag_risk(asset)
     if "error" in result:
-        await update.message.reply_text(f"❌ {result['error']}")
+        await update.message.reply_text(f"{result['error']}")
     else:
         await update.message.reply_text(result["llm_result"])
 

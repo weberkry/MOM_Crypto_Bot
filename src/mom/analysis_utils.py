@@ -144,7 +144,7 @@ def PDF(DF, pdf="cauchy", interval="Minute"):
     
     # p value of cvm statistic
     df_p_value = Mandelbrot.list_to_df_with_dates([float(cvm[0].pvalue)],start_date="1970-01-01", parameter="p_value")
-    print([float(cvm[0].pvalue)])
+    #print([float(cvm[0].pvalue)])
     df_p_value["pdf"] = pdf
     df_p_value["interval"] = interval
     influx.write_dataframe(df_p_value, in_bucket="PDF")
@@ -193,12 +193,12 @@ def get_pdf(interval = "Minute"):
 
     if len(DF) > 0:
         
-        if "cauchy" in DF["pdf"]:
+        if "cauchy" in DF["pdf"].values:
             print("cauchy pdf already calculated")
         else:
             DF_prices = influx.query_returns(asset="BTC", interval=interval, start="0", field="delta")
             PDF(DF_prices, pdf="cauchy", interval=interval)
-        if "gauss" in DF["pdf"]:
+        if "gauss" in DF["pdf"].values:
             print("gauss pdf already calculated")
         else:
             DF_prices = influx.query_returns(asset="BTC", interval=interval, start="0", field="delta")
@@ -209,7 +209,7 @@ def get_pdf(interval = "Minute"):
         #print("PRICES DF ---------------------------------------")
         ##print(DF_prices.head())
         if len(DF_prices) > 50000:
-            DF_prices = DF_prices.sample(n=50000, random_state=42)
+            DF_prices = DF_prices.sample(n=30000, random_state=42)
         print("analyszing PDF cauchy")
         PDF(DF_prices, pdf="cauchy", interval=interval)
         print("analyszing PDF gauss")
