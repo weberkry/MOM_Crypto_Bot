@@ -1,7 +1,9 @@
 import os
 from dotenv import load_dotenv
-from influxdb_client import InfluxDBClient, WriteOptions
+from influxdb_client import InfluxDBClient, WriteOptions, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
+import json
+
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 from mom import Mandelbrot
@@ -46,14 +48,27 @@ def write_dataframe(df, in_bucket=INFLUX_BUCKET):
         raise ValueError("DataFrame must have a datetime64[ns, UTC] column named 'time'")
     df.index.name = "_time"
 
-    #print(f"Writing to InfluxDB bucket '{in_bucket}-{measurement}'")
-    write_api.write(
-        bucket=in_bucket,
-        org=INFLUX_ORG,
-        record=df,
-        data_frame_measurement_name=df.interval.iloc[0],
-        data_frame_tag_columns=["asset", "currency","interval"],
-    )
+    if in_bucket == "PDF":
+        #print(df.head())
+        #print(f"Writing to InfluxDB bucket '{in_bucket}-{measurement}'")
+        write_api.write(
+            bucket=in_bucket,
+            org=INFLUX_ORG,
+            record=df,
+            data_frame_measurement_name=df.interval.iloc[0],
+            data_frame_tag_columns=["asset", "currency","interval","parameter","pdf"],
+        )
+    
+    else:
+
+        #print(f"Writing to InfluxDB bucket '{in_bucket}-{measurement}'")
+        write_api.write(
+            bucket=in_bucket,
+            org=INFLUX_ORG,
+            record=df,
+            data_frame_measurement_name=df.interval.iloc[0],
+            data_frame_tag_columns=["asset", "currency","interval"],
+        )
     print(f"Wrote {len(df)} rows to InfluxDB bucket '{in_bucket}---->{df.interval.iloc[0]}'")
 
 
@@ -97,27 +112,60 @@ def query_returns(asset="BTC", interval="Day", start="-30d",field="returns", buc
     #Q = client.get_query_api()
     Q = get_query_api(get_client())
 
-    flux = f'''
-    from(bucket: "{bucket}")
-      |> range(start: {start})
-      |> filter(fn: (r) => r["_measurement"] == "{interval}")
-      |> filter(fn: (r) => r["asset"] == "{asset}")
-      |> filter(fn: (r) => r["_field"] == "{field}")
-      |> keep(columns: ["_time", "_value"])
-    '''
+    if bucket == "PDF":
+        print("using this road")
+        flux = f'''
+        from(bucket: "{bucket}")
+        |> range(start: {start})
+        |> filter(fn: (r) => r["_measurement"] == "{interval}")
+        |> filter(fn: (r) => r["asset"] == "{asset}")
+        |> filter(fn: (r) => r["_field"] == "{field}")
+        |> drop(columns: ["_start", "_stop"])
+        '''
+        tables = Q.query(org=INFLUX_ORG, query=flux)
 
-    tables = Q.query(org=INFLUX_ORG, query=flux)
 
-    # convert FluxTable → pandas DataFrame
-    records = []
-    for table in tables:
-        for record in table.records:  # type: FluxRecord
-            records.append({
-                "time": record["_time"],
-                field: record["_value"],
-            })
+        records = []
+        for table in tables:
+            for record in table.records:  # type: FluxRecord
+                row = {
+                    "time": record["_time"],
+                    "_field": record["_field"],
+                    "_value": record["_value"],
+                }
+                # Add all tag keys dynamically
+                for key, val in record.values.items():
+                    if key not in ["_time", "_value", "_field", "_start", "_stop", "_measurement"]:
+                        row[key] = val
+                # Optional: keep measurement as well
+                row["_measurement"] = record["_measurement"]
+                records.append(row)
+    
+    else:
+
+        flux = f'''
+        from(bucket: "{bucket}")
+        |> range(start: {start})
+        |> filter(fn: (r) => r["_measurement"] == "{interval}")
+        |> filter(fn: (r) => r["asset"] == "{asset}")
+        |> filter(fn: (r) => r["_field"] == "{field}")
+        |> keep(columns: ["_time", "_value"])
+        '''
+
+        tables = Q.query(org=INFLUX_ORG, query=flux)
+
+        # convert FluxTable → pandas DataFrame
+        records = []
+        for table in tables:
+            for record in table.records:  # type: FluxRecord
+                records.append({
+                    "time": record["_time"],
+                    field: record["_value"],
+                })
+
 
     df = pd.DataFrame(records)
+    print(df.head())
     if not df.empty:
         df.set_index("time", inplace=True)
         df["asset"] = asset
@@ -482,4 +530,9 @@ def write_from_backup(directory = BACKUP_DIR, year="all", bucket = "CryptoPrices
 
     else:
         print("Select valid file")
+
+
+
+
+
     

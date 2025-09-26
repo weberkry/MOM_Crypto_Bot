@@ -110,6 +110,68 @@ def get_hurst_historic(asset=ASSET,currency = CURRENCY, end= influx.get_last_tim
         influx.write_hurst(MIN_hurst)
         influx.write_hurst(DAY_hurst)
     
+def PDF(DF, pdf="cauchy", interval="Minute"):
+    
+    if pdf == "cauchy":
+        params, pdf_fitted, x = Mandelbrot.cauchy_pdf(DF["delta"])
+        cvm = Mandelbrot.calculate_pdf_fit(DF["delta"],params, pdf)
+    
+
+    elif pdf == "gauss":
+        params, pdf_fitted, x = Mandelbrot.gauss_pdf(DF["delta"])
+        cvm = Mandelbrot.calculate_pdf_fit(DF["delta"], params, "norm")
+        
+    else:
+        print("pick a Probability density function")
+        
+    #arg = params[:-2]
+    loc = params[-2]   #sigma (variance) for gauss/ #x0 (peak value) for cauchy
+    scale = params[-1] #mu (mean) for gauss / 
+                       #gamma (the distance from the peak x0 where the PDF drops to half its maximum value) for cauchy
+
+        
+    #x values for pdf fit
+    df_x_values = Mandelbrot.list_to_df_with_dates(x,start_date="1970-01-01", parameter="x_values")
+    df_x_values["pdf"] = pdf
+    df_x_values["interval"] = interval
+    influx.write_dataframe(df_x_values, in_bucket="PDF")
+    
+    #y values for df fit
+    df_y_values = Mandelbrot.list_to_df_with_dates(pdf_fitted,start_date="1970-01-01", parameter="pdf_values")
+    df_y_values["pdf"] = pdf
+    df_y_values["interval"] = interval
+    influx.write_dataframe(df_y_values, in_bucket="PDF")
+    
+    # p value of cvm statistic
+    df_p_value = Mandelbrot.list_to_df_with_dates([float(cvm[0].pvalue)],start_date="1970-01-01", parameter="p_value")
+    print([float(cvm[0].pvalue)])
+    df_p_value["pdf"] = pdf
+    df_p_value["interval"] = interval
+    influx.write_dataframe(df_p_value, in_bucket="PDF")
+    
+    #cvm statisitc
+    df_cvm = Mandelbrot.list_to_df_with_dates([cvm[0].statistic],start_date="1970-01-01", parameter="cvm")
+    df_cvm["pdf"] = pdf
+    df_cvm["interval"] = interval
+    influx.write_dataframe(df_cvm, in_bucket="PDF")
+    
+    #pdf loc
+    #sigma (variance) for gauss
+    #x0 (peak value) for cauchy
+    df_loc = Mandelbrot.list_to_df_with_dates([float(loc)],start_date="1970-01-01", parameter="loc")
+    df_loc["pdf"] = pdf
+    df_loc["interval"] = interval
+    influx.write_dataframe(df_loc, in_bucket="PDF")
+    
+    #pdf scale
+    #mu (mean) for gauss / 
+    #gamma (the distance from the peak x0 where the PDF drops to half its maximum value) for cauchy
+    df_scale = Mandelbrot.list_to_df_with_dates([float(scale)],start_date="1970-01-01", parameter="scale")
+    df_scale["pdf"] = pdf
+    df_scale["interval"] = interval
+    influx.write_dataframe(df_scale, in_bucket="PDF")
+
+    return cvm
 
 
 def pdf_fit_return(DF):

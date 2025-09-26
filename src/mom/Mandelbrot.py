@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import time
 import matplotlib.pyplot as plt
@@ -238,7 +238,36 @@ def process_raw_DF(DF):
     #print(DF.head())
     
     return DF[col]
+def list_to_df_with_dates(values, start_date="1970-01-01", parameter="pdf_values"):
+    """
+    Convert a list of values to a DataFrame with consecutive daily UTC timestamps.
+    Args:
+        values: list of numbers
+        start_date: str, starting date in 'YYYY-MM-DD' format
+    Returns:
+        pd.DataFrame with 'time' (datetime64[ns, UTC]) and 'value'
+    """
+    # Ensure start_date is datetime with UTC
+    start = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
+
+    # Generate consecutive daily timestamps
+    dates = [start + timedelta(days=i) for i in range(len(values))]
+
+    # Create DataFrame directly with datetime
+    df = pd.DataFrame({
+        "time": pd.to_datetime(dates, utc=True),
+        "value": values
+    })
+
+    df["asset"] = "BTC"
+    df["interval"] = "Minute"
+    df["currency"] = "EUR"
+    df["parameter"] = f"{parameter}"
+    df.index = df["time"]
+
+    
+    return df
 
 def log10(df):
     data = np.array(df).astype(float)
