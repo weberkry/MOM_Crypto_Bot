@@ -272,12 +272,24 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
     print("Hurst (Min):",H_Minute," ",h_cat_min)
 
     # 2) Get PDF FIT
-    DF_Day = influx.query_returns(asset=ASSET, interval="Day", start="0", field="delta")
-    DF_Min = influx.query_returns(asset=ASSET, interval="Minute", start="0", field="delta")
-    DF_Min = DF_Min.sample(n=50000, random_state=42) # Full DF is too big
+    #DF_Day = influx.query_returns(asset=ASSET, interval="Day", start="0", field="delta")
+    #DF_Min = influx.query_returns(asset=ASSET, interval="Minute", start="0", field="delta")
+    #DF_Min = DF_Min.sample(n=50000, random_state=42) # Full DF is too big
     
-    cvm_Min = analysis.pdf_fit_return(DF_Min)
-    cvm_Day = analysis.pdf_fit_return(DF_Day)
+    #cvm_Min = analysis.pdf_fit_return(DF_Min)
+    #cvm_Day = analysis.pdf_fit_return(DF_Day)
+    def get_cvm_values(DF):
+        cvm_cauchy = [(DF["parameter"] == "cvm") & (DF["pdf"] == "cauchy")]
+        cvm_c = cvm_cauchy["_value"].iloc[0]
+        cvm_gauss = [(DF["parameter"] == "cvm") & (DF["pdf"] == "gauss")]
+        cvm_g = cvm_gauss["_value"].iloc[0]
+        return [cvm_gauss, cvm_cauchy]
+
+    pdf_Min = analysis.get_pdf(interval="Minute")
+    pdf_Day = analysis.get_pdf(interval="Day")
+
+    cvm_Min = get_cvm_values(pdf_Min)
+    cvm_Day = get_cvm_values(pdf_Day)
 
     # 2) Fetch news (relative lookback)
     since = datetime.now(timezone.utc) - timedelta(days=lookback_news_days)
