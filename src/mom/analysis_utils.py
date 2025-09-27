@@ -184,6 +184,15 @@ def pdf_fit_return(DF):
 
     return cvm
 
+def categorize_hurst(h: float):
+    if h is None:
+        return "unknown"
+    if h < 0.45:
+        return "high_volatility"
+    elif h < 0.55:
+        return "random_walk"
+    else:
+        return "trending"
 
 def get_pdf(interval = "Minute"):
 

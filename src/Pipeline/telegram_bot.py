@@ -1,41 +1,20 @@
-import sys, os
-
+import os
+import asyncio
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-from telegram.ext import CommandHandler
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+from langchain.agents import AgentType, initialize_agent
 
-from mom import pipeline_utils as pipeline
-
-
-from openai import OpenAI
-from sentence_transformers import SentenceTransformer
-#import faiss
-import hnswlib
-
-#news
-from newsapi import NewsApiClient
-import praw
+# === import your pipeline + tools ===
+from mom.pipeline_agent import agent, rag_risk  # assumes tools+agent are defined in pipeline_agent.py
 
 
-#the following entries are expected in the MOM_Crypto_Bot/.env
-ASSET = os.getenv("ASSET")
-CURRENCY = os.getenv("CURRENCY")
-
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-#OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-OPENAI_MODEL = "gpt-4o-mini"
-#OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
-OPENAI_TEMPERATURE = float("0.0")
-
-NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
-#REDDIT_ID = os.getenv("REDDIT_CLIENT_ID")
-#REDDIT_SECRET = os.getenv("REDDIT_SECRET")
-TELEGRAM_API = os.getenv("TELEGRAM_API")
-
-OpenAI.api_key = OPENAI_KEY
-newsapi = NewsApiClient(api_key=NEWSAPI_KEY)
-
-
+# /risk command ----
 async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     asset = "BTC"  # default
     if context.args:  # e.g. /risk ETH
@@ -43,26 +22,39 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"Evaluating risk for {asset}...")
 
-    result = pipeline.run_rag_risk(asset)
-    if "error" in result:
-        await update.message.reply_text(f"{result['error']}")
-    else:
-        await update.message.reply_text(result["llm_result"])
+    try:
+        # run the rag_risk tool directly (not via agent)
+        result = rag_risk.run(asset)
+        await update.message.reply_text(result)
+    except Exception as e:
+        await update.message.reply_text(f"Error in /risk: {e}")
 
 
-
-# Telegram bot
+# ---- freeform chat ----
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
-    response = agent.run(user_message)
-    await update.message.reply_text(response)
+    try:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, agent.run, user_message)
+        await update.message.reply_text(response)
+    except Exception as e:
+        await update.message.reply_text(f"Agent error: {e}")
 
-app = ApplicationBuilder().token(TELEGRAM_API).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-# Register handler
-app.add_handler(CommandHandler("risk", risk_command))
+
+# ---- main ----
+def main():
+    TELEGRAM_API = os.getenv("TELEGRAM_API")
+    app = ApplicationBuilder().token(TELEGRAM_API).build()
+
+    # register handlers
+    app.add_handler(CommandHandler("risk", risk_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("I'm up and running! I'll do my best!")
+    #print("...sheesh..the internet is dark and full of terror...")
+    #print("ok... enough internet... let me think about it...")
+    app.run_polling()
 
 
 if __name__ == "__main__":
-    print("Bot is running...")
-    app.run_polling()
+    main()
