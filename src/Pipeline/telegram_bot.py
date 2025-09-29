@@ -22,7 +22,9 @@ TELEGRAM_API = os.getenv("TELEGRAM_API")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
+    llevel=logging.DEBUG,   
+    filename="telegram_bot.log",
+    filemode="a"
 )
 logger = logging.getLogger(__name__)
 
@@ -67,7 +69,7 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         asset = context.args[0].upper()
 
-    await update.message.reply_text(f"⚡ Evaluating risk for {asset}...")
+    await update.message.reply_text(f"Evaluating risk for {asset}...")
 
     try:
         result = rag_risk(asset)  # call tool directly
