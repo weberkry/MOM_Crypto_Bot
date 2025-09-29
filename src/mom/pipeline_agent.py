@@ -45,15 +45,15 @@ newsapi = NewsApiClient(api_key=NEWSAPI_KEY)
 #client = OpenAI(api_key=OPENAI_KEY)
 
 
-# ---- Embeddings ----
+# 1)Embeddings
 embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 VectorStoreClass = FAISS
 
-# ---- LLM ----
+# 2) LLM init
 llm = ChatOpenAI(model=OPENAI_MODEL, temperature=OPENAI_TEMPERATURE,openai_api_key=OPENAI_KEY)
 
 
-# ---- NewsAPI fetch function ----
+# 3) NewsAPI fetch function 
 def fetch_newsapi_articles(
     query: str,
     from_date: str = None,
@@ -87,7 +87,7 @@ def fetch_newsapi_articles(
         })
     return cleaned
 
-# ---- Tools ----
+# Tools for agent
 #@tool("fetch_news", return_direct=False)
 def fetch_news_tool(query: str) -> str:
     """
@@ -231,8 +231,8 @@ agent = initialize_agent(
 
 # ---- Example usage ----
 if __name__ == "__main__":
-    # Structured call
+    # Structured call -> telegram bot /risk BTC
     print(agent.run("Run rag_risk on BTC"))
 
-    # Freeform Q&A
+    # open call -> felxible queries
     print(agent.run("What is the risk level for ETH right now based on news and Hurst?"))

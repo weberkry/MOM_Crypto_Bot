@@ -63,7 +63,7 @@ _articles_store = {}  # id -> metadata + text
 
     
 def init_index(max_elements=20000):
-    """Initialize index only once."""
+    """Initialize index only once"""
     global _index_initialized
     if not _index_initialized:
         _index.init_index(max_elements=max_elements, ef_construction=200, M=16)
@@ -296,7 +296,7 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
     cvm_Min = get_cvm_values(pdf_Min)
     cvm_Day = get_cvm_values(pdf_Day)
 
-    # 2) Fetch news (relative lookback)
+    # 23) Fetch news (relative lookback)
     print("Step 3 --- Get recent news --- ")
     since = datetime.now(timezone.utc) - timedelta(days=lookback_news_days)
     from_date = since.strftime("%Y-%m-%dT%H:%M:%S")
@@ -319,7 +319,7 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-    # 3) Add articles to index
+    # 4) Add articles to index
     added = add_articles_to_index(articles)
     #print(added)
     if not added:
@@ -339,7 +339,7 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-    # 4) Retrieve relevant items
+    # 5) Retrieve relevant items
     retrieved = retrieve(asset, k=top_k)
     #print(retrieved)
     if not retrieved:
@@ -359,7 +359,7 @@ def run_rag_risk(asset="BTC", lookback_news_days=7, top_k=5):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-    # 5) Build prompt and query LLM
+    # 6) Build prompt and query LLM
     prompt = build_prompt(asset, H_Minute, h_cat_min,H_Day, h_cat_day,cvm_Day[0],cvm_Min[0],cvm_Day[1],cvm_Min[1], retrieved)
     
     #print(prompt)

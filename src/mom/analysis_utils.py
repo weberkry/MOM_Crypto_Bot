@@ -193,6 +193,7 @@ def categorize_hurst(h: float):
         return "random_walk"
     else:
         return "trending"
+    
 
 def get_pdf(interval = "Minute"):
 

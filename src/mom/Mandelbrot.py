@@ -404,7 +404,8 @@ def calculate_pdf_fit(data, params, pdf):
     return fit_test
 
 
-
+#---> no longer in use 
+# see class Hurst below
 class hurst:
     def __init__(self):
         self.hurst = None
@@ -481,7 +482,7 @@ class hurst:
         plt.show()
         
 
-
+#current class in use
 class Hurst:
     def __init__(self):
         self.results = {}  # stores Hurst per time frame

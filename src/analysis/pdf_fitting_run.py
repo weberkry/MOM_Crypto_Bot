@@ -21,10 +21,6 @@ CURRENCY = os.getenv("CURRENCY")
 
 #DF_Min = DF_Min.sample(n=50000, random_state=42) # Full DF is too big
 
-
-
-
-
 if __name__ == "__main__":
     cvm_Min = analysis.get_pdf(interval="Minute")
     cvm_Day = analysis.get_pdf(interval="Day")
