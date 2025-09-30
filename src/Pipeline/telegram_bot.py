@@ -13,10 +13,10 @@ from telegram.ext import (
 from deep_translator import GoogleTranslator
 from langdetect import detect
 
-# === Import your pipeline + tools ===
+# Import pipeline + tools
 from mom.pipeline_agent import agent, rag_risk
 
-# ---- Setup ----
+# general Setup 
 load_dotenv()
 TELEGRAM_API = os.getenv("TELEGRAM_API")
 
@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-#  Language translator
+#Language translator
 def detect_and_translate(text: str, target_lang="en"):
     """Detect input language, translate to target_lang if needed."""
     try:
@@ -108,7 +108,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Agent error: {e}")
 
 
-# ---- Main ----
+# Main 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_API).build()
 

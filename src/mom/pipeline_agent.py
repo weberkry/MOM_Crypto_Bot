@@ -229,7 +229,7 @@ agent = initialize_agent(
 )
 
 
-# ---- Example usage ----
+#usage 
 if __name__ == "__main__":
     # Structured call -> telegram bot /risk BTC
     print(agent.run("Run rag_risk on BTC"))
