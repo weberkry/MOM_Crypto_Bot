@@ -50,7 +50,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Hi! I’m your Crypto Risk Bot\n"
         "Use /risk BTC to evaluate risk of BTC (according to Benoît Mandelbrot)\n"
-        "Or just ask me free-form questions"
+        "Or just ask me free-form questions\n"
+        "...\n"
+        "one more thing:\n"
+        "Please be patient with me :-) \n" 
+        "I'm running on a RaspberryPi server and may run into performance issues,\n" 
+        "because depending on the request I may have to do some heavy calculations.\n"  
+        "A response time of about 2-3min is to be expected and if I do not respond please try again later."
     )
 
 

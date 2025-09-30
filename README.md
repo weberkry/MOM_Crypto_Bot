@@ -7,11 +7,16 @@ Benoît Mandelbrot’s The Misbehavior of Markets: A Fractal View of Financial T
 
 Telegram Bot : CryptoMOM
 
-Use "/start" in the bot to get started.
+Use "/start" in the bot to get started  
+
 Use "/help" for information on how to interact with this bot
 
 
 ## Notes
 
-This project is still in the very beginning and currently has only the probability density function fitting and hurst calculation available
+This project is still in the very beginning and currently has only the probability density function fitting and hurst calculation available  
+
+Please be patient with the bot.  
+It is running on a RaspberryPi server and may run into performance issues, because depending on the request there will be a massive calculation in the background.  
+A response time of about 2-3min is to be expected and if no repsonse is provide please try again later.
 
