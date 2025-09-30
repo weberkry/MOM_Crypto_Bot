@@ -22,7 +22,7 @@ TELEGRAM_API = os.getenv("TELEGRAM_API")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    llevel=logging.DEBUG,   
+    level=logging.DEBUG,   
     filename="telegram_bot.log",
     filemode="a"
 )
