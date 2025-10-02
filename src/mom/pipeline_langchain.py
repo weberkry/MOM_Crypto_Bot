@@ -14,6 +14,7 @@ from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain.schema import Document
 from langchain.tools import tool
 from langchain.agents import initialize_agent, AgentType
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from langchain_community.vectorstores import FAISS
 #news
@@ -47,6 +48,7 @@ newsapi = NewsApiClient(api_key=NEWSAPI_KEY)
 
 # 1)Embeddings
 embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+#embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 VectorStoreClass = FAISS
 
 # 2) LLM init
@@ -224,7 +226,8 @@ tools = [fetch_news_single, get_hurst, get_pdf_fit, rag_risk]  # replace old fet
 agent = initialize_agent(
     tools,
     llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    #agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    agent=AgentType.OPENAI_FUNCTIONS,
     verbose=True,
 )
 

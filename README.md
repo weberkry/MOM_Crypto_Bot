@@ -11,10 +11,14 @@ Use "/start" in the bot to get started
 
 Use "/help" for information on how to interact with this bot
 
+You can also prompt you question in a different language and the bot will answer accordingly.  
+But the translation is not so smooth and needs some attention.
+
 
 ## Notes
 
-This project is still in the very beginning and currently has only the probability density function fitting and hurst calculation available  
+This project is still in the very beginning and currently has only the probability density function fitting and hurst calculation available.
+The data is stored in an InfluxDB and currently only BTC Data is available, others will follow.
 
 Please be patient with the bot.  
 It is running on a RaspberryPi server and may run into performance issues, because depending on the request there will be a massive calculation in the background.  
