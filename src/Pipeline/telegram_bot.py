@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-# Import LangGraph pipeline
+#Import LangGraph pipeline
 import mom.pipeline_langgraph as lg
 
 from langchain_community.vectorstores import FAISS
@@ -32,16 +32,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ---- Commands ----
+# Commands
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Hi! I’m your Crypto Risk Bot\n"
+        "Hi! I'm your Crypto Risk Bot\n"
         "Use /risk BTC to evaluate risk of BTC (according to Benoît Mandelbrot)\n"
-        "Or just ask me free-form questions\n"
+        "Use /help if you need a reminder of what I can do\n"
+        "still in beta: Or just ask me free-form questions\n"
         "...\n"
-        "⚠️ One more thing:\n"
+        "One more thing:\n"
         "I'm running on a RaspberryPi server, so depending on the request I may have to do some heavy calculations.\n"
-        "A response time of 2-3min is normal. If I do not respond, please try again later."
+        "A response time of 2-3min is normal, so please be patient with me. If I do not respond, please try again later."
     )
 
 
@@ -50,7 +51,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Available commands:\n"
         "/start - Welcome message\n"
         "/help - Show this help\n"
-        "/risk <ASSET> - Run the risk pipeline (default BTC)\n"
+        "/risk BTC - Run the risk pipeline (default BTC)\n"
         "Or type any crypto-related question!"
     )
 

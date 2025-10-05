@@ -13,7 +13,7 @@ from newsapi import NewsApiClient
 import praw
 
 # Tools (custom toolbox)
-from mom.toolbox import toolbox, rag_risk   # ✅ Import rag_risk explicitly
+from mom.toolbox import toolbox, rag_risk   # Import rag_risk explicitly for defined command /risk BTC
 
 # Load environment
 load_dotenv()
@@ -22,25 +22,25 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL")
 OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
 
 
-# ---- Agent State ----
+# define Agent State
 class AgentState(TypedDict, total=False):
     input: str
-    translated_input: Optional[str]
-    detected_lang: Optional[str]
+    translated_input: Optional[str]   #adjusted for diff languages
+    detected_lang: Optional[str]      #detect input langaue to answer in the same language
     messages: list
     agent_output: Optional[str]
     final_output: Optional[str]
 
 
-# ---- LLM ----
+#setup LLM --> as defined in .env
 llm = ChatOpenAI(
     api_key=OPENAI_KEY,
     model=OPENAI_MODEL,
-    temperature=OPENAI_TEMPERATURE,
+    temperature=OPENAI_TEMPERATURE,   #now set to 0
 )
 
 
-# ---- Translation ----
+# Translation Node ---> freetext input
 def translate_in_node(state: AgentState):
     from deep_translator import GoogleTranslator
     try:
@@ -60,7 +60,7 @@ def translate_in_node(state: AgentState):
         "messages": [HumanMessage(content=translated)],
     }
 
-
+# Translation Node ---> llm output according to detected input language
 def translate_back_node(state: AgentState):
     from deep_translator import GoogleTranslator
     output = state.get("agent_output", "")
@@ -71,7 +71,7 @@ def translate_back_node(state: AgentState):
     return {"final_output": translated}
 
 
-# ---- Reasoning / Tool Nodes ----
+# imported from toolbox (mom/toolbox.py)
 tool_node = ToolNode(tools=toolbox)
 
 
@@ -86,23 +86,24 @@ def llm_node(state: AgentState):
     }
 
 
-# ---- Build Graph ----
-graph = StateGraph(AgentState)
-graph.add_node("translate_in", translate_in_node)
-graph.add_node("llm", llm_node)
-graph.add_node("tools", tool_node)
+#Graph node settings
+graph = StateGraph(AgentState)   # see agent state above
+graph.add_node("translate_in", translate_in_node)  #translation of input text (freeform)
+graph.add_node("llm", llm_node) # get llm result
+graph.add_node("tools", tool_node) # defined tools for pipeline
 graph.add_node("translate_back", translate_back_node)
 
-graph.set_entry_point("translate_in")
-graph.add_edge("translate_in", "llm")
+# define connections
+graph.set_entry_point("translate_in") #defines start point
+graph.add_edge("translate_in", "llm") 
 graph.add_edge("llm", "tools")
 graph.add_edge("tools", "translate_back")
-graph.set_finish_point("translate_back")
+graph.set_finish_point("translate_back") # define endpoint
 
 agent_app = graph.compile()
 
 
-# ---- Wrappers ----
+# Wrappers to catch telegram bot input errors ---> common error was "input not found"
 def run(user_input: str) -> str:
     """Generic free-form pipeline (LangGraph path)."""
     if not user_input.strip():
@@ -110,7 +111,7 @@ def run(user_input: str) -> str:
     result = agent_app.invoke({"input": user_input})
     return result.get("final_output", result.get("agent_output", "No response generated"))
 
-
+# this just activates by explicitly running /risk BTC in the bot
 def run_risk(asset: str = "BTC") -> str:
     """Direct risk evaluation tool call (bypasses LLM)."""
     try:
@@ -119,10 +120,10 @@ def run_risk(asset: str = "BTC") -> str:
         return f"Error running rag_risk on {asset}: {e}"
 
 
-# ---- Debug / Test ----
+#test
 if __name__ == "__main__":
     print(">>> /risk BTC")
     print(run_risk("BTC"))
 
     print("\n>>> Freeform")
-    print(run("What is the risk level for ETH right now based on news and Hurst?"))
+    print(run("What is the risk level for BTC right now based on news and Hurst?"))

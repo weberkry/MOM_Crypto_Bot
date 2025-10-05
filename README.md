@@ -2,6 +2,9 @@
 
 Benoît Mandelbrot’s The Misbehavior of Markets: A Fractal View of Financial Turbulence is a remarkable book that challenges conventional finance and introduces fractal geometry into market analysis. This repository translates some of those ideas into code, with a focus on applying fractal-based methods to estimate risks in cryptocurrencies and the broader stock market.
 
+"I have no financial interest in their success of failure; I am a scientist, not a money man. 
+But I wish you godd fortune."  -Mandelbrot
+
 
 ## How to use it
 
