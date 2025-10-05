@@ -62,7 +62,7 @@ async def risk_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         asset = context.args[0].upper()
 
-    await update.message.reply_text(f"⚡ Evaluating risk for {asset}... please wait")
+    await update.message.reply_text(f"Evaluating risk for {asset}... please wait")
 
     try:
         loop = asyncio.get_event_loop()
